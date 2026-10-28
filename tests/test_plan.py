@@ -107,6 +107,14 @@ class TestPlan(unittest.TestCase):
         self.assertEqual(plan.loop, 2)
         self.assertEqual(plan.steps[0].seconds, 1.5)
 
+    def test_template_must_be_a_path_string(self) -> None:
+        for template in (123, ["a.png"], {"path": "a.png"}):
+            with self.subTest(template=template):
+                with self.assertRaises(ConfigError):
+                    Plan.from_dict({
+                        "steps": [{"action": "click", "template": template}]
+                    })
+
     def test_invalid_press_key_is_rejected_at_load(self) -> None:
         with self.assertRaises(ConfigError):
             Plan.from_dict({"steps": [{"action": "press", "key": "nope"}]})

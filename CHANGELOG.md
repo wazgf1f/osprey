@@ -13,6 +13,8 @@ Keep a Changelog, and the project uses semantic versioning.
   so templates on a secondary display can be captured and clicked.
 - Monitors left of the primary are positioned with Win32 `SetWindowPos`, since
   Tk reads negative geometry offsets as distances from the right edge.
+- Plan steps reject non-path template values at load time instead of coercing
+  them to strings and failing later at runtime.
 
 ### Fixed
 

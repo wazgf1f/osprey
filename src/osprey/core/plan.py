@@ -63,6 +63,14 @@ def _field_float(value: Any, name: str) -> float:
     return number
 
 
+def _template_value(value: Any) -> Any:
+    if value is None:
+        return ""
+    if isinstance(value, os.PathLike):
+        return os.fspath(value)
+    return value
+
+
 def _field_int(value: Any, name: str) -> int:
     if isinstance(value, bool):
         raise ConfigError("%s must be an integer, got %r" % (name, value))
@@ -101,6 +109,9 @@ class Step:
         if self.action not in ACTIONS:
             raise ConfigError("%s: unknown action %r (use %s)"
                               % (where, self.action, ", ".join(ACTIONS)))
+        if self.template is not None and not isinstance(self.template, (str, os.PathLike)):
+            raise ConfigError("%s: template must be a path string, got %r"
+                              % (where, self.template))
         if self.action in ("click", "move"):
             if not self.template:
                 raise ConfigError("%s: %s needs a template" % (where, self.action))
@@ -165,7 +176,7 @@ class Step:
             raise ConfigError("step %d has no action" % (index + 1))
         step = cls(
             action=str(data["action"]),
-            template=str(data.get("template", "") or ""),
+            template=_template_value(data.get("template")),
             seconds=_field_float(data.get("seconds", 0) or 0, "seconds"),
             wait=_field_float(data.get("wait", 0) or 0, "wait"),
             key=str(data.get("key", "") or ""),
