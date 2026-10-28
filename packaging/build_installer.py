@@ -164,7 +164,7 @@ try {
     New-Item -Path $key -Force -ErrorAction Stop | Out-Null
     Set-ItemProperty -Path $key -Name DisplayName -Value "Osprey 0.1.0"
     Set-ItemProperty -Path $key -Name DisplayVersion -Value "0.1.0"
-    Set-ItemProperty -Path $key -Name Publisher -Value "Osprey contributors"
+    Set-ItemProperty -Path $key -Name Publisher -Value "Zhaorui Chen"
     Set-ItemProperty -Path $key -Name InstallLocation -Value $Dest
     Set-ItemProperty -Path $key -Name DisplayIcon -Value $icon
     Set-ItemProperty -Path $key -Name UninstallString -Value ('"' + (Join-Path $Dest "uninstall.bat") + '"')

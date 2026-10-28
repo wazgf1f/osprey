@@ -9,7 +9,7 @@ description = "Screen-vision automation engine for Windows: capture, detect, dec
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-authors = [{ name = "Osprey contributors" }]
+authors = [{ name = "Zhaorui Chen" }]
 keywords = [
     "automation", "computer-vision", "template-matching", "rpa",
     "win32", "sendinput", "screen-capture", "game-automation",
