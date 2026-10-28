@@ -37,6 +37,31 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
+    def test_editing_is_locked_while_running(self) -> None:
+        import tkinter as tk
+
+        from osprey.gui import PlanEditor
+
+        try:
+            editor = PlanEditor()
+        except tk.TclError as exc:  # pragma: no cover - headless session
+            self.skipTest("no display available: %s" % exc)
+
+        try:
+            editor._running = True
+            editor._set_running_buttons()
+            before = list(editor.steps)
+            editor._add_wait()
+            self.assertEqual(editor.steps, before)
+            self.assertEqual(str(editor.capture_button["state"]), "disabled")
+            editor._running = False
+            editor._set_running_buttons()
+            editor._add_wait()
+            self.assertEqual(len(editor.steps), len(before) + 1)
+        finally:
+            logging.getLogger("osprey").removeHandler(editor._log_handler)
+            editor.root.destroy()
+
     def test_stop_before_ready_is_remembered(self) -> None:
         import tkinter as tk
 

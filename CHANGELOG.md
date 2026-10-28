@@ -47,6 +47,8 @@ Keep a Changelog, and the project uses semantic versioning.
 - Clicking stop before the engine's first tick is now remembered and honored.
 - Log callbacks are ignored after the editor window closes.
 - `Safety` rejects non-finite `max_runtime` values.
+- Editing controls (capture, add, move, delete, open, save) are disabled while
+  a run is active, so capture no longer hides the window mid-run.
 
 ## [0.1.0] - 2026-10-28
 

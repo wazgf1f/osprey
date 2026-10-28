@@ -296,20 +296,24 @@ class PlanEditor:
 
         primary_row = ttk.Frame(toolbar)
         primary_row.pack(fill="x")
-        capture = tk.Button(
+        self._edit_buttons = []
+        self.capture_button = tk.Button(
             primary_row, text="＋  框选模板并添加点击", command=self._capture_step,
             bg=PALETTE["accent"], fg="white", activebackground=PALETTE["accent_dark"],
             activeforeground="white", relief="flat", bd=0, padx=14, pady=7,
             cursor="hand2", font=(FONT, 10, "bold"),
         )
-        capture.pack(side="left")
+        self.capture_button.pack(side="left")
+        self._edit_buttons.append(self.capture_button)
         for label, command in (
             ("添加点击", self._add_click),
             ("添加等待", self._add_wait),
             ("添加按键", self._add_press),
         ):
-            ttk.Button(primary_row, text=label, command=command,
-                       style="Tool.TButton").pack(side="left", padx=(6, 0))
+            button = ttk.Button(primary_row, text=label, command=command,
+                                style="Tool.TButton")
+            button.pack(side="left", padx=(6, 0))
+            self._edit_buttons.append(button)
 
         secondary_row = ttk.Frame(toolbar)
         secondary_row.pack(fill="x", pady=(6, 0))
@@ -321,8 +325,10 @@ class PlanEditor:
             ("编辑", self._edit_selected),
             ("删除", self._delete_selected),
         ):
-            ttk.Button(secondary_row, text=label, command=command,
-                       style="Tool.TButton").pack(side="left", padx=(0, 4))
+            button = ttk.Button(secondary_row, text=label, command=command,
+                                style="Tool.TButton")
+            button.pack(side="left", padx=(0, 4))
+            self._edit_buttons.append(button)
 
         settings = ttk.LabelFrame(self.root, text="计划设置", padding=10)
         settings.grid(row=2, column=0, sticky="ew", padx=12, pady=(2, 0))
@@ -388,12 +394,15 @@ class PlanEditor:
 
         actions = ttk.Frame(self.root, padding=(12, 0, 12, 6))
         actions.grid(row=4, column=0, sticky="ew")
-        ttk.Button(actions, text="打开计划", command=self._open_dialog,
-                   style="Tool.TButton").pack(side="left")
-        ttk.Button(actions, text="保存", command=self._save,
-                   style="Tool.TButton").pack(side="left", padx=(6, 0))
-        ttk.Button(actions, text="另存为", command=lambda: self._save(True),
-                   style="Tool.TButton").pack(side="left", padx=(6, 0))
+        for label, command, pad in (
+            ("打开计划", self._open_dialog, 0),
+            ("保存", self._save, 6),
+            ("另存为", lambda: self._save(True), 6),
+        ):
+            button = ttk.Button(actions, text=label, command=command,
+                                style="Tool.TButton")
+            button.pack(side="left", padx=(pad, 0))
+            self._edit_buttons.append(button)
         self.stop_button = ttk.Button(actions, text="■  停止", command=self._stop,
                                       state="disabled", style="Tool.TButton")
         self.stop_button.pack(side="right")
@@ -534,6 +543,8 @@ class PlanEditor:
 
     # -- editing -----------------------------------------------------------
     def _add_click(self) -> None:
+        if self._running:
+            return
         path = filedialog.askopenfilename(
             title="选择模板图片",
             filetypes=[("PNG 图片", "*.png"), ("所有文件", "*.*")],
@@ -544,14 +555,20 @@ class PlanEditor:
         self._refresh(select=len(self.steps) - 1)
 
     def _add_wait(self) -> None:
+        if self._running:
+            return
         self.steps.append(Step("wait", seconds=1.0))
         self._refresh(select=len(self.steps) - 1)
 
     def _add_press(self) -> None:
+        if self._running:
+            return
         self.steps.append(Step("press", key="enter", wait=0.5))
         self._refresh(select=len(self.steps) - 1)
 
     def _edit_selected(self) -> None:
+        if self._running:
+            return
         index = self._selected()
         if index is None:
             return
@@ -562,6 +579,8 @@ class PlanEditor:
             self._refresh(select=index)
 
     def _delete_selected(self) -> None:
+        if self._running:
+            return
         index = self._selected()
         if index is None:
             return
@@ -569,6 +588,8 @@ class PlanEditor:
         self._refresh(select=min(index, len(self.steps) - 1) if self.steps else None)
 
     def _move(self, delta: int) -> None:
+        if self._running:
+            return
         index = self._selected()
         if index is None:
             return
@@ -580,6 +601,8 @@ class PlanEditor:
 
     # -- capture -----------------------------------------------------------
     def _capture_step(self) -> None:
+        if self._running:
+            return
         path = self._capture_template()
         if not path:
             return
@@ -730,12 +753,16 @@ class PlanEditor:
 
     def _set_running_buttons(self) -> None:
         state = "disabled" if self._running else "normal"
+        for button in self._edit_buttons:
+            button.configure(state=state)
         self.dry_button.configure(state=state)
         self.live_button.configure(state=state)
         self.stop_button.configure(state="normal" if self._running else "disabled")
 
     # -- files -------------------------------------------------------------
     def _open_dialog(self) -> None:
+        if self._running:
+            return
         path = filedialog.askopenfilename(
             title="打开计划", filetypes=[("Osprey 计划", "*.json"), ("所有文件", "*.*")]
         )
@@ -751,6 +778,8 @@ class PlanEditor:
         self._load_plan(plan, path=os.path.abspath(path))
 
     def _save(self, save_as: bool = False) -> None:
+        if self._running:
+            return
         try:
             plan = self._collect()
         except ConfigError as exc:
