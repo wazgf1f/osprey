@@ -48,6 +48,12 @@ class TestSafety(unittest.TestCase):
         with self.assertRaises(ValueError):
             Safety(max_runtime=0)
 
+    def test_non_finite_runtime_is_rejected(self) -> None:
+        for value in (float("nan"), float("inf")):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    Safety(max_runtime=value)
+
     def test_invalid_abort_key_is_rejected_early(self) -> None:
         with self.assertRaises(ValueError):
             Safety(abort_keys=("not-a-real-key",))

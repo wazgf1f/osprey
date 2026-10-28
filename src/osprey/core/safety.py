@@ -7,6 +7,7 @@ because it is rarely bound by games or apps.
 
 from __future__ import annotations
 
+import math
 import os
 import time
 from typing import Iterable, Optional, Sequence, Tuple
@@ -24,8 +25,8 @@ class Safety:
         stop_file: Optional[str] = None,
         max_runtime: Optional[float] = None,
     ) -> None:
-        if max_runtime is not None and max_runtime <= 0:
-            raise ValueError("max_runtime must be positive")
+        if max_runtime is not None and (not math.isfinite(max_runtime) or max_runtime <= 0):
+            raise ValueError("max_runtime must be a positive finite number")
         if isinstance(abort_keys, str):
             abort_keys = (abort_keys,)
         self.abort_keys: Tuple[str, ...] = tuple(abort_keys)

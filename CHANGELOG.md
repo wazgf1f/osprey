@@ -44,6 +44,9 @@ Keep a Changelog, and the project uses semantic versioning.
 - `hold`, `press`, `write` and `move_to` validate their timing parameters
   before sending any input event.
 - The editor sizes itself to the available screen instead of assuming 1320x880.
+- Clicking stop before the engine's first tick is now remembered and honored.
+- Log callbacks are ignored after the editor window closes.
+- `Safety` rejects non-finite `max_runtime` values.
 
 ## [0.1.0] - 2026-10-28
 

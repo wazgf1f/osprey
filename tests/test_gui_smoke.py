@@ -37,6 +37,28 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
+    def test_stop_before_ready_is_remembered(self) -> None:
+        import tkinter as tk
+
+        from osprey.core.safety import Safety
+        from osprey.gui import PlanEditor
+
+        try:
+            editor = PlanEditor()
+        except tk.TclError as exc:  # pragma: no cover - headless session
+            self.skipTest("no display available: %s" % exc)
+
+        try:
+            editor._stop()
+            self.assertTrue(editor._stop_requested)
+            safety = Safety(abort_keys=())
+            ctx = type("Ctx", (), {"safety": safety, "input": None})()
+            editor._on_ready(ctx)
+            self.assertTrue(safety.aborted)
+        finally:
+            logging.getLogger("osprey").removeHandler(editor._log_handler)
+            editor.root.destroy()
+
 
 if __name__ == "__main__":
     unittest.main()

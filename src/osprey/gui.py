@@ -238,6 +238,7 @@ class PlanEditor:
         self._safety = None
         self._input = None
         self._running = False
+        self._stop_requested = False
         self._closing = False
         self._log_handler: Optional[_LogHandler] = None
 
@@ -454,6 +455,13 @@ class PlanEditor:
         self._log_handler = handler
 
     def _append_log(self, level: str, message: str) -> None:
+        if self._closing:
+            return
+        try:
+            if not self.log_text.winfo_exists():
+                return
+        except tk.TclError:
+            return
         self.log_text.configure(state="normal")
         if getattr(self, "_log_empty", False):
             self.log_text.delete("1.0", "end")
@@ -662,6 +670,7 @@ class PlanEditor:
         ):
             return
 
+        self._stop_requested = False
         self._running = True
         self._set_running_buttons()
         self._set_status("运行中…" if not live else "真实运行中…", kind="run")
@@ -692,14 +701,18 @@ class PlanEditor:
     def _on_ready(self, ctx) -> None:
         self._safety = ctx.safety
         self._input = ctx.input
+        if self._stop_requested:
+            ctx.safety.request_stop("stopped before the first tick")
 
     def _stop(self) -> None:
+        self._stop_requested = True
         if self._safety is not None:
             self._safety.request_stop("stopped from the editor")
-            self._set_status("正在停止…", kind="run")
+        self._set_status("正在停止…", kind="run")
 
     def _finished(self, stats) -> None:
         self._running = False
+        self._stop_requested = False
         self._safety = None
         self._input = None
         self._set_running_buttons()
@@ -708,6 +721,7 @@ class PlanEditor:
 
     def _failed(self, exc: Exception) -> None:
         self._running = False
+        self._stop_requested = False
         self._safety = None
         self._input = None
         self._set_running_buttons()
