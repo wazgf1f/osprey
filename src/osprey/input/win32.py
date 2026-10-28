@@ -325,8 +325,16 @@ class InputController:
         _send(*events)
 
     def _sleep(self, seconds: float) -> None:
-        if seconds > 0:
-            time.sleep(seconds)
+        """Sleep in slices so a panic key can interrupt holds, typing and moves."""
+        if seconds <= 0:
+            return
+        end = time.monotonic() + seconds
+        while True:
+            self._check_abort()
+            remaining = end - time.monotonic()
+            if remaining <= 0:
+                return
+            time.sleep(min(0.02, remaining))
 
     # -- mouse -------------------------------------------------------------
     def position(self) -> Tuple[int, int]:

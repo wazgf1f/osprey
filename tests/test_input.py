@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import sys
+import time
 import unittest
 
 from osprey.errors import Aborted
@@ -83,6 +84,19 @@ class TestDryRunInput(unittest.TestCase):
         with self.assertRaises(Aborted):
             controller.click(1, 2)
         self.assertEqual(controller.history, [])
+
+    def test_hold_can_be_aborted(self) -> None:
+        calls = {"count": 0}
+
+        def guard() -> bool:
+            calls["count"] += 1
+            return calls["count"] > 2
+
+        controller = InputController(dry_run=True, should_abort=guard)
+        started = time.monotonic()
+        with self.assertRaises(Aborted):
+            controller.hold("a", 5.0)
+        self.assertLess(time.monotonic() - started, 1.0)
 
     def test_release_all_is_safe_when_nothing_is_held(self) -> None:
         self.controller.release_all()

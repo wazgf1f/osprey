@@ -20,6 +20,7 @@ Keep a Changelog, and the project uses semantic versioning.
 - Task factory/constructor errors in `osprey run` surface as `ConfigError`.
 - Key-press steps are counted in run statistics.
 - Closing the editor mid-run no longer posts callbacks to a destroyed window.
+- Long key holds, typing and cursor glides can now be interrupted by the panic key.
 
 ## [0.1.0] - 2026-10-28
 
