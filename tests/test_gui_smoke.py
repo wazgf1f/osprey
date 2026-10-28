@@ -77,6 +77,32 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
+    def test_capture_overlay_handles_negative_origin(self) -> None:
+        import tkinter as tk
+
+        import numpy as np
+
+        from osprey.capture.base import Frame
+        from osprey.gui import PlanEditor
+
+        try:
+            editor = PlanEditor()
+        except tk.TclError as exc:  # pragma: no cover - headless session
+            self.skipTest("no display available: %s" % exc)
+
+        try:
+            overlay = tk.Toplevel(editor.root)
+            overlay.overrideredirect(True)
+            frame = Frame(np.zeros((40, 60, 4), dtype=np.uint8), origin=(-100, 50))
+            editor._place_capture_overlay(overlay, frame)
+            overlay.update_idletasks()
+            self.assertEqual(overlay.winfo_width(), 60)
+            self.assertEqual(overlay.winfo_height(), 40)
+            overlay.destroy()
+        finally:
+            logging.getLogger("osprey").removeHandler(editor._log_handler)
+            editor.root.destroy()
+
     def test_store_template_does_not_overwrite(self) -> None:
         import os
         import tkinter as tk

@@ -636,8 +636,7 @@ class PlanEditor:
 
         overlay = tk.Toplevel(self.root)
         overlay.overrideredirect(True)
-        overlay.geometry("%dx%d%+d%+d" % (frame.width, frame.height,
-                                          frame.origin[0], frame.origin[1]))
+        self._place_capture_overlay(overlay, frame)
         overlay.attributes("-topmost", True)
         overlay.attributes("-alpha", 0.30)
         overlay.configure(bg="black")
@@ -681,6 +680,26 @@ class PlanEditor:
         self.root.deiconify()
         self.root.lift()
         return state.get("path")
+
+    def _place_capture_overlay(self, overlay: tk.Toplevel, frame) -> None:
+        """Position the overlay over the virtual desktop.
+
+        Tk reads a negative geometry offset as "distance from the right edge",
+        which is wrong for a monitor left of the primary. Those cases are moved
+        explicitly with SetWindowPos.
+        """
+        x, y = frame.origin
+        overlay.geometry("%dx%d+0+0" % (frame.width, frame.height))
+        overlay.update_idletasks()
+        if x >= 0 and y >= 0:
+            overlay.geometry("%dx%d+%d+%d" % (frame.width, frame.height, x, y))
+            return
+        hwnd = overlay.winfo_id()
+        root = ctypes.windll.user32.GetAncestor(hwnd, 2) or hwnd
+        flags = 0x0010 | 0x0040  # SWP_NOACTIVATE | SWP_SHOWWINDOW
+        ctypes.windll.user32.SetWindowPos(
+            root, -1, x, y, frame.width, frame.height, flags)
+        overlay.update_idletasks()
 
     def _store_template(self, frame, left: int, top: int, right: int, bottom: int) -> Optional[str]:
         """Crop, save and report a template; None means the write failed."""

@@ -11,6 +11,8 @@ Keep a Changelog, and the project uses semantic versioning.
   toolbar, striped steps table, dark log panel and a status indicator.
 - The editor captures across all monitors and runs plans with `all_screens`,
   so templates on a secondary display can be captured and clicked.
+- Monitors left of the primary are positioned with Win32 `SetWindowPos`, since
+  Tk reads negative geometry offsets as distances from the right edge.
 
 ### Fixed
 
