@@ -93,6 +93,16 @@ class TestLoadTask(unittest.TestCase):
             task = _load_task(path)
         self.assertEqual(task.name, "sibling-7")
 
+    def test_imported_task_classes_are_not_candidates(self) -> None:
+        source = (
+            "from osprey.core.task import Task, FunctionTask\n\n"
+            "class Mine(Task):\n"
+            "    def step(self, ctx):\n"
+            "        pass\n"
+        )
+        task = self._load(source)
+        self.assertEqual(type(task).__name__, "Mine")
+
     def test_factory_errors_become_config_error(self) -> None:
         source = (
             "from osprey.core.task import Task\n\n"

@@ -265,7 +265,9 @@ def _load_task(path: str) -> Task:
             # A module with exactly one Task subclass is unambiguous; accept it.
             classes = [
                 value for value in vars(module).values()
-                if isinstance(value, type) and issubclass(value, Task) and value is not Task
+                if (isinstance(value, type) and issubclass(value, Task)
+                    and value is not Task
+                    and getattr(value, "__module__", None) == module.__name__)
             ]
             if len(classes) == 1:
                 task = instantiate(classes[0], "task constructor")

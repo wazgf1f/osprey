@@ -59,6 +59,8 @@ Keep a Changelog, and the project uses semantic versioning.
 - If screen capture cannot even be initialised, the editor restores itself and
   shows an error instead of staying hidden.
 - The editor window is clamped to the screen, including 800x600 and 1024x600.
+- `osprey run` auto-detection ignores Task subclasses that were merely imported,
+  so one local task class is no longer reported as ambiguous.
 
 ## [0.1.0] - 2026-10-28
 
