@@ -58,6 +58,7 @@ Keep a Changelog, and the project uses semantic versioning.
 - The engine closes its owned frame source when the first grab fails.
 - If screen capture cannot even be initialised, the editor restores itself and
   shows an error instead of staying hidden.
+- The editor window is clamped to the screen, including 800x600 and 1024x600.
 
 ## [0.1.0] - 2026-10-28
 

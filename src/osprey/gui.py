@@ -56,6 +56,15 @@ PALETTE = {
 }
 
 
+def _window_geometry(screen_w: int, screen_h: int) -> tuple:
+    """Choose a window that always fits, even on 800x600 or 1024x600 screens."""
+    screen_w = max(320, int(screen_w))
+    screen_h = max(240, int(screen_h))
+    width = min(screen_w, max(720, min(1320, screen_w - 80)))
+    height = min(screen_h, max(560, min(880, screen_h - 120)))
+    return width, height
+
+
 def _as_float(var: tk.StringVar, label: str) -> float:
     try:
         return float(var.get().strip())
@@ -221,8 +230,7 @@ class PlanEditor:
         self.root.title("Osprey 计划编辑器")
         screen_w = self.root.winfo_screenwidth()
         screen_h = self.root.winfo_screenheight()
-        width = min(1320, max(960, screen_w - 80))
-        height = min(880, max(640, screen_h - 120))
+        width, height = _window_geometry(screen_w, screen_h)
         self.root.geometry("%dx%d+%d+%d" % (
             width, height,
             max(0, (screen_w - width) // 2),

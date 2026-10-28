@@ -39,6 +39,21 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
+    def test_window_geometry_always_fits_screen(self) -> None:
+        from osprey.gui import _window_geometry
+
+        for screen_w, screen_h in ((2560, 1600), (1920, 1080), (1366, 768),
+                                   (1024, 600), (800, 600), (640, 480)):
+            with self.subTest(screen=(screen_w, screen_h)):
+                width, height = _window_geometry(screen_w, screen_h)
+                self.assertLessEqual(width, screen_w)
+                self.assertLessEqual(height, screen_h)
+                self.assertGreaterEqual(width, 320)
+                self.assertGreaterEqual(height, 240)
+
+        self.assertEqual(_window_geometry(2560, 1600), (1320, 880))
+        self.assertEqual(_window_geometry(800, 600), (720, 560))
+
     def test_capture_failure_restores_window(self) -> None:
         import tkinter as tk
         from unittest import mock
