@@ -100,6 +100,36 @@ class TestEngine(unittest.TestCase):
         mapped = EngineConfig.from_mapping({"abort_keys": "f12"})
         self.assertEqual(mapped.abort_keys, ("f12",))
 
+    def test_numeric_strings_are_coerced(self) -> None:
+        config = EngineConfig(fps="8", duration="2.5", max_runtime="10", speed="1.5")
+        self.assertEqual(config.fps, 8.0)
+        self.assertEqual(config.duration, 2.5)
+        self.assertEqual(config.max_runtime, 10.0)
+        self.assertEqual(config.speed, 1.5)
+
+    def test_non_finite_numbers_are_rejected(self) -> None:
+        for kwargs in (
+            {"fps": float("nan")},
+            {"duration": float("inf")},
+            {"max_runtime": float("nan")},
+            {"speed": float("inf")},
+        ):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(ValueError):
+                    EngineConfig(**kwargs)
+
+    def test_invalid_numbers_raise_value_error(self) -> None:
+        for kwargs in (
+            {"fps": "fast"},
+            {"duration": "soon"},
+            {"max_runtime": True},
+            {"speed": "quick"},
+            {"dry_run": "no"},
+        ):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(ValueError):
+                    EngineConfig(**kwargs)
+
     def test_config_validation(self) -> None:
         for kwargs in ({"fps": 0}, {"duration": -1}, {"speed": 0}, {"move_mode": "warp"}):
             with self.subTest(kwargs=kwargs):

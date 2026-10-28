@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Optional, Tuple
@@ -16,6 +17,22 @@ from .stats import Stats
 from .task import Task
 
 logger = logging.getLogger(__name__)
+
+
+def _engine_number(value: Any, name: str, *, allow_none: bool = False) -> Optional[float]:
+    if value is None:
+        if allow_none:
+            return None
+        raise ValueError("%s is required" % name)
+    if isinstance(value, bool):
+        raise ValueError("%s must be a number, got %r" % (name, value))
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("%s must be a number, got %r" % (name, value)) from exc
+    if not math.isfinite(number):
+        raise ValueError("%s must be finite, got %r" % (name, value))
+    return number
 
 
 @dataclass
@@ -36,6 +53,12 @@ class EngineConfig:
             self.abort_keys = (self.abort_keys,)
         else:
             self.abort_keys = tuple(self.abort_keys)
+        if not isinstance(self.dry_run, bool):
+            raise ValueError("dry_run must be true or false, got %r" % (self.dry_run,))
+        self.fps = _engine_number(self.fps, "fps")
+        self.duration = _engine_number(self.duration, "duration", allow_none=True)
+        self.max_runtime = _engine_number(self.max_runtime, "max_runtime", allow_none=True)
+        self.speed = _engine_number(self.speed, "speed")
         if self.fps <= 0:
             raise ValueError("fps must be positive")
         if self.duration is not None and self.duration <= 0:
@@ -50,13 +73,13 @@ class EngineConfig:
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "EngineConfig":
         return cls(
-            fps=float(data.get("fps", 8.0)),
+            fps=data.get("fps", 8.0),
             duration=data.get("duration"),
-            dry_run=bool(data.get("dry_run", True)),
+            dry_run=data.get("dry_run", True),
             abort_keys=data.get("abort_keys", ("f12",)),
             stop_file=data.get("stop_file"),
             max_runtime=data.get("max_runtime"),
-            speed=float(data.get("speed", 1.0)),
+            speed=data.get("speed", 1.0),
             move_mode=str(data.get("move_mode", "absolute")),
         )
 

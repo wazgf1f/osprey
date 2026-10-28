@@ -23,6 +23,7 @@ and its assets folder can be copied to another machine together.
 from __future__ import annotations
 
 import json
+import math
 import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -41,6 +42,8 @@ def _require_number(value: Any, name: str, *, minimum: float = 0.0,
         number = float(value)
     except (TypeError, ValueError) as exc:
         raise ConfigError("%s must be a number, got %r" % (name, value)) from exc
+    if not math.isfinite(number):
+        raise ConfigError("%s must be finite, got %r" % (name, value))
     if number < minimum:
         raise ConfigError("%s must be >= %s, got %s" % (name, minimum, number))
     if maximum is not None and number > maximum:
@@ -52,9 +55,12 @@ def _field_float(value: Any, name: str) -> float:
     if isinstance(value, bool):
         raise ConfigError("%s must be a number, got %r" % (name, value))
     try:
-        return float(value)
+        number = float(value)
     except (TypeError, ValueError) as exc:
         raise ConfigError("%s must be a number, got %r" % (name, value)) from exc
+    if not math.isfinite(number):
+        raise ConfigError("%s must be finite, got %r" % (name, value))
+    return number
 
 
 def _field_int(value: Any, name: str) -> int:
@@ -64,7 +70,7 @@ def _field_int(value: Any, name: str) -> int:
         number = float(value)
     except (TypeError, ValueError) as exc:
         raise ConfigError("%s must be an integer, got %r" % (name, value)) from exc
-    if number != int(number):
+    if not math.isfinite(number) or number != int(number):
         raise ConfigError("%s must be an integer, got %r" % (name, value))
     return int(number)
 
@@ -251,8 +257,22 @@ class Plan:
 
     def save(self, path: str) -> None:
         self.validate()
-        folder = os.path.dirname(os.path.abspath(path))
+        target = os.path.abspath(path)
+        folder = os.path.dirname(target)
         if folder:
             os.makedirs(folder, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as handle:
-            json.dump(self.to_dict(), handle, ensure_ascii=False, indent=2)
+
+        data = self.to_dict()
+        if folder and os.path.abspath(folder) != os.path.abspath(self.base_dir):
+            # Relative templates are anchored to the plan file. Saving elsewhere
+            # would silently break them, so pin them to absolute paths first.
+            for step_data, step in zip(data["steps"], self.steps):
+                if (step.action in ("click", "move") and step.template
+                        and not os.path.isabs(step.template)):
+                    absolute = self.resolve(step.template)
+                    step_data["template"] = absolute
+                    step.template = absolute
+
+        with open(target, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, ensure_ascii=False, indent=2)
+        self.base_dir = folder

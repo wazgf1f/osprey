@@ -68,6 +68,20 @@ class TestLocate(unittest.TestCase):
         self.assertAlmostEqual(x, 100 + 10 + det.w / 2)
         self.assertAlmostEqual(y, 50 + 12 + det.h / 2)
 
+    def test_point_handles_negative_origin(self) -> None:
+        frame = make_frame(self.template, (10, 12), origin=(-1920, 100))
+        ctx = Context(
+            frame=frame,
+            screen=FakeScreen(lambda: frame),
+            input=InputController(dry_run=True),
+            safety=Safety(abort_keys=()),
+            config={"threshold": 0.9},
+        )
+        det = ctx.locate(self.template)
+        x, y = ctx.point(det)
+        self.assertAlmostEqual(x, -1920 + 10 + det.w / 2)
+        self.assertAlmostEqual(y, 100 + 12 + det.h / 2)
+
     def test_point_accepts_tuple(self) -> None:
         x, y = self.ctx.point((1.5, 2.5))
         self.assertEqual((x, y), (1.5, 2.5))

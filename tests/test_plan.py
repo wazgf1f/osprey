@@ -128,6 +128,37 @@ class TestPlan(unittest.TestCase):
         self.assertEqual(step.timeout, 3.0)
         self.assertEqual(step.scales, [1.0, 1.25])
 
+    def test_non_finite_numbers_are_rejected(self) -> None:
+        for kwargs in (
+            {"threshold": float("nan")},
+            {"timeout": float("inf")},
+            {"fps": float("nan")},
+            {"scales": [1.0, float("nan")]},
+        ):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(ConfigError):
+                    Plan(**kwargs).validate()
+        with self.assertRaises(ConfigError):
+            Plan.from_dict({"steps": [{"action": "wait", "seconds": float("nan")}]})
+
+    def test_save_elsewhere_pins_relative_templates(self) -> None:
+        with temp_dir() as source, temp_dir() as target:
+            plan = Plan(base_dir=source, steps=[Step("click", template="assets/a.png")])
+            path = os.path.join(target, "plan.json")
+            plan.save(path)
+            loaded = Plan.load(path)
+            expected = os.path.join(source, "assets", "a.png")
+            self.assertEqual(loaded.steps[0].template, expected)
+            self.assertEqual(plan.steps[0].template, expected)
+
+    def test_save_in_place_keeps_relative_templates(self) -> None:
+        with temp_dir() as folder:
+            plan = Plan(base_dir=folder, steps=[Step("click", template="assets/a.png")])
+            path = os.path.join(folder, "plan.json")
+            plan.save(path)
+            loaded = Plan.load(path)
+            self.assertEqual(loaded.steps[0].template, "assets/a.png")
+
     def test_missing_file_raises(self) -> None:
         with self.assertRaises(ConfigError):
             Plan.load("no-such-plan.json")

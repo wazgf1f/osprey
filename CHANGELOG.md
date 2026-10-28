@@ -26,6 +26,11 @@ Keep a Changelog, and the project uses semantic versioning.
 - Degenerate template scales (a flat 1x1 resize) are skipped instead of failing
   the whole search.
 - Released keys keep their original name in the action history.
+- `EngineConfig` coerces numeric strings and rejects NaN/infinity instead of
+  failing with `TypeError`.
+- Plan numbers must be finite; NaN/infinity raise `ConfigError`.
+- Saving a plan into another directory pins its relative templates to absolute
+  paths instead of silently breaking them.
 
 ## [0.1.0] - 2026-10-28
 
