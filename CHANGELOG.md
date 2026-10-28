@@ -19,6 +19,8 @@ Keep a Changelog, and the project uses semantic versioning.
   instead of raising `TypeError` on the first poll.
 - Plans built with `pathlib.Path` templates now serialize with `os.fspath`,
   so saving no longer fails inside `json.dump`.
+- `Plan.validate` reports `ConfigError` for a non-list `steps` value or a
+  non-`Step` entry instead of raising `AttributeError`.
 
 ### Fixed
 

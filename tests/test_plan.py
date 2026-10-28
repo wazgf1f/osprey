@@ -108,6 +108,12 @@ class TestPlan(unittest.TestCase):
         self.assertEqual(plan.loop, 2)
         self.assertEqual(plan.steps[0].seconds, 1.5)
 
+    def test_steps_must_be_step_objects(self) -> None:
+        with self.assertRaises(ConfigError):
+            Plan(steps="abc").validate()
+        with self.assertRaises(ConfigError):
+            Plan(steps=[None]).validate()
+
     def test_template_must_be_a_path_string(self) -> None:
         for template in (123, ["a.png"], {"path": "a.png"}):
             with self.subTest(template=template):

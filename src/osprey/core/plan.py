@@ -214,7 +214,12 @@ class Plan:
         if self.on_missing not in MISSING_POLICIES:
             raise ConfigError("on_missing must be 'stop' or 'skip'")
         self.scales = _require_scales(self.scales)
+        if not isinstance(self.steps, list):
+            raise ConfigError("steps must be a list")
         for index, step in enumerate(self.steps):
+            if not isinstance(step, Step):
+                raise ConfigError("step %d must be a Step object, got %r"
+                                  % (index + 1, type(step).__name__))
             step.validate(index)
         return self
 
