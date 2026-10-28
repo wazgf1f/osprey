@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from osprey.core.engine import Engine, EngineConfig
 from osprey.core.task import Task
@@ -153,6 +154,11 @@ class TestEngine(unittest.TestCase):
         self.assertEqual(EngineConfig(abort_keys="f12").abort_keys, ("f12",))
         mapped = EngineConfig.from_mapping({"abort_keys": "f12"})
         self.assertEqual(mapped.abort_keys, ("f12",))
+
+    def test_stop_file_must_be_a_path(self) -> None:
+        with self.assertRaises(ValueError):
+            EngineConfig(stop_file=123)
+        self.assertEqual(EngineConfig(stop_file=Path("stop.txt")).stop_file, "stop.txt")
 
     def test_numeric_strings_are_coerced(self) -> None:
         config = EngineConfig(fps="8", duration="2.5", max_runtime="10", speed="1.5")

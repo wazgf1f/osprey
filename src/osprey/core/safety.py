@@ -27,6 +27,10 @@ class Safety:
     ) -> None:
         if max_runtime is not None and (not math.isfinite(max_runtime) or max_runtime <= 0):
             raise ValueError("max_runtime must be a positive finite number")
+        if stop_file is not None:
+            if not isinstance(stop_file, (str, os.PathLike)):
+                raise ValueError("stop_file must be a path string or None")
+            stop_file = os.fspath(stop_file)
         if isinstance(abort_keys, str):
             abort_keys = (abort_keys,)
         self.abort_keys: Tuple[str, ...] = tuple(abort_keys)

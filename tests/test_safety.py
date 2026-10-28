@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import time
 import unittest
+from pathlib import Path
 
 from osprey.core.safety import Safety
 from osprey.errors import Aborted
@@ -47,6 +48,11 @@ class TestSafety(unittest.TestCase):
     def test_invalid_runtime(self) -> None:
         with self.assertRaises(ValueError):
             Safety(max_runtime=0)
+
+    def test_stop_file_must_be_a_path(self) -> None:
+        with self.assertRaises(ValueError):
+            Safety(stop_file=123)
+        self.assertEqual(Safety(stop_file=Path("stop.txt")).stop_file, "stop.txt")
 
     def test_non_finite_runtime_is_rejected(self) -> None:
         for value in (float("nan"), float("inf")):

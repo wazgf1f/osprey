@@ -15,6 +15,8 @@ Keep a Changelog, and the project uses semantic versioning.
   Tk reads negative geometry offsets as distances from the right edge.
 - Plan steps reject non-path template values at load time instead of coercing
   them to strings and failing later at runtime.
+- `EngineConfig` and `Safety` validate `stop_file` (accepting `PathLike`)
+  instead of raising `TypeError` on the first poll.
 
 ### Fixed
 

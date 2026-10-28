@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Optional, Tuple
@@ -55,6 +56,10 @@ class EngineConfig:
             self.abort_keys = tuple(self.abort_keys)
         if not isinstance(self.dry_run, bool):
             raise ValueError("dry_run must be true or false, got %r" % (self.dry_run,))
+        if self.stop_file is not None:
+            if not isinstance(self.stop_file, (str, os.PathLike)):
+                raise ValueError("stop_file must be a path string or None")
+            self.stop_file = os.fspath(self.stop_file)
         self.fps = _engine_number(self.fps, "fps")
         self.duration = _engine_number(self.duration, "duration", allow_none=True)
         self.max_runtime = _engine_number(self.max_runtime, "max_runtime", allow_none=True)
