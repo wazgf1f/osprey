@@ -210,7 +210,7 @@ def _send(*events: INPUT) -> None:
 
 
 def _key_event(vk: int, up: bool) -> INPUT:
-    scan = _user32.MapVirtualKeyW(vk, MAPVK_VK_TO_VSC)
+    scan = _user32.MapVirtualKeyW(vk, MAPVK_VK_TO_VSC) if _IS_WINDOWS else 0
     flags = KEYEVENTF_SCANCODE
     if vk in _EXTENDED_KEYS:
         flags |= KEYEVENTF_EXTENDEDKEY
@@ -261,6 +261,9 @@ def is_key_pressed(key) -> bool:
 
 
 def _absolute_xy(x: int, y: int) -> Tuple[int, int]:
+    if not _IS_WINDOWS:
+        # Dry runs never send the event; avoid touching Win32 metrics off Windows.
+        return (0, 0)
     vx, vy, vw, vh = virtual_screen()
     ax = int(round((x - vx) * 65535.0 / max(1, vw - 1)))
     ay = int(round((y - vy) * 65535.0 / max(1, vh - 1)))
