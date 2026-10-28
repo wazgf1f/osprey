@@ -33,6 +33,20 @@ class FindAndClick(Task):
         self.torn_down = True
 
 
+class SetupExploding(Task):
+    def __init__(self) -> None:
+        self.torn_down = False
+
+    def setup(self, ctx) -> None:
+        raise RuntimeError("setup boom")
+
+    def step(self, ctx) -> None:
+        pass
+
+    def teardown(self, ctx) -> None:
+        self.torn_down = True
+
+
 class Exploding(Task):
     def setup(self, ctx) -> None:
         self.torn_down = False
@@ -122,6 +136,18 @@ class TestEngine(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             engine.run()
         self.assertTrue(source.closed)
+
+    def test_teardown_runs_when_setup_fails(self) -> None:
+        task = SetupExploding()
+        engine = Engine(
+            task,
+            config=EngineConfig(abort_keys=()),
+            source=self.source,
+            controller=InputController(dry_run=True),
+        )
+        with self.assertRaises(RuntimeError):
+            engine.run()
+        self.assertTrue(task.torn_down)
 
     def test_abort_key_string_is_not_split(self) -> None:
         self.assertEqual(EngineConfig(abort_keys="f12").abort_keys, ("f12",))

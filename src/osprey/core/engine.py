@@ -153,8 +153,10 @@ class Engine:
         ctx_ready = False
 
         try:
-            self.task.setup(ctx)
+            # Teardown must run even when setup fails halfway, so mark the
+            # context as entered before calling setup.
             ctx_ready = True
+            self.task.setup(ctx)
             if on_ready is not None:
                 on_ready(ctx)
             while True:

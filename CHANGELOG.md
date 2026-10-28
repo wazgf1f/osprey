@@ -61,6 +61,8 @@ Keep a Changelog, and the project uses semantic versioning.
 - The editor window is clamped to the screen, including 800x600 and 1024x600.
 - `osprey run` auto-detection ignores Task subclasses that were merely imported,
   so one local task class is no longer reported as ambiguous.
+- A task's `teardown()` now runs even when `setup()` fails halfway, so partial
+  resources are released.
 
 ## [0.1.0] - 2026-10-28
 
