@@ -65,6 +65,7 @@ class SequenceTask(Task):
 
         if step.action == "press":
             ctx.input.press(step.key)
+            ctx.stats.actions += 1
             if step.wait:
                 ctx.sleep(step.wait)
             return

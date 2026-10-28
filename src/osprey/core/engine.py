@@ -32,6 +32,10 @@ class EngineConfig:
     move_mode: str = "absolute"
 
     def __post_init__(self) -> None:
+        if isinstance(self.abort_keys, str):
+            self.abort_keys = (self.abort_keys,)
+        else:
+            self.abort_keys = tuple(self.abort_keys)
         if self.fps <= 0:
             raise ValueError("fps must be positive")
         if self.duration is not None and self.duration <= 0:
@@ -49,7 +53,7 @@ class EngineConfig:
             fps=float(data.get("fps", 8.0)),
             duration=data.get("duration"),
             dry_run=bool(data.get("dry_run", True)),
-            abort_keys=tuple(data.get("abort_keys", ("f12",))),
+            abort_keys=data.get("abort_keys", ("f12",)),
             stop_file=data.get("stop_file"),
             max_runtime=data.get("max_runtime"),
             speed=float(data.get("speed", 1.0)),

@@ -95,6 +95,11 @@ class TestEngine(unittest.TestCase):
         self.assertLess(stats.elapsed, 2.0)
         self.assertGreater(stats.ticks, 0)
 
+    def test_abort_key_string_is_not_split(self) -> None:
+        self.assertEqual(EngineConfig(abort_keys="f12").abort_keys, ("f12",))
+        mapped = EngineConfig.from_mapping({"abort_keys": "f12"})
+        self.assertEqual(mapped.abort_keys, ("f12",))
+
     def test_config_validation(self) -> None:
         for kwargs in ({"fps": 0}, {"duration": -1}, {"speed": 0}, {"move_mode": "warp"}):
             with self.subTest(kwargs=kwargs):

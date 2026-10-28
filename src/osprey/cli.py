@@ -250,9 +250,15 @@ def _load_task(path: str) -> Task:
             "could not import %s: %s: %s" % (path, type(exc).__name__, exc)
         ) from exc
 
+    def instantiate(value, label):
+        try:
+            return value()
+        except Exception as exc:
+            raise ConfigError("%s failed: %s: %s" % (label, type(exc).__name__, exc)) from exc
+
     factory = getattr(module, "create_task", None)
     if callable(factory):
-        task = factory()
+        task = instantiate(factory, "create_task()")
     else:
         task = getattr(module, "TASK", None)
         if task is None:
@@ -262,7 +268,7 @@ def _load_task(path: str) -> Task:
                 if isinstance(value, type) and issubclass(value, Task) and value is not Task
             ]
             if len(classes) == 1:
-                task = classes[0]()
+                task = instantiate(classes[0], "task constructor")
             elif not classes:
                 raise ConfigError(
                     "%s defines no Task subclass; add one, or expose TASK / create_task()" % path
@@ -273,7 +279,7 @@ def _load_task(path: str) -> Task:
                     % (path, ", ".join(sorted(cls.__name__ for cls in classes)))
                 )
         elif isinstance(task, type):
-            task = task()
+            task = instantiate(task, "task constructor")
     if not isinstance(task, Task):
         raise ConfigError("task must be an osprey Task instance, got %r" % (type(task),))
     return task

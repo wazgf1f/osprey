@@ -16,6 +16,10 @@ Keep a Changelog, and the project uses semantic versioning.
 - Invalid `press` keys and abort keys are rejected when the plan/config loads.
 - `osprey run` task modules can import sibling helper modules.
 - The visual editor closes its capture grabber after taking a template.
+- A string `abort_keys` value is no longer split into single characters.
+- Task factory/constructor errors in `osprey run` surface as `ConfigError`.
+- Key-press steps are counted in run statistics.
+- Closing the editor mid-run no longer posts callbacks to a destroyed window.
 
 ## [0.1.0] - 2026-10-28
 

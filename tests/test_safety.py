@@ -52,6 +52,9 @@ class TestSafety(unittest.TestCase):
         with self.assertRaises(ValueError):
             Safety(abort_keys=("not-a-real-key",))
 
+    def test_string_abort_key_is_not_split(self) -> None:
+        self.assertEqual(Safety(abort_keys="f12").abort_keys, ("f12",))
+
     def test_valid_abort_keys_are_kept(self) -> None:
         safety = Safety(abort_keys=("f12", "ctrl"))
         self.assertEqual(safety.abort_keys, ("f12", "ctrl"))

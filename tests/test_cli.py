@@ -93,6 +93,30 @@ class TestLoadTask(unittest.TestCase):
             task = _load_task(path)
         self.assertEqual(task.name, "sibling-7")
 
+    def test_factory_errors_become_config_error(self) -> None:
+        source = (
+            "from osprey.core.task import Task\n\n"
+            "class Only(Task):\n"
+            "    def step(self, ctx):\n"
+            "        pass\n\n"
+            "def create_task():\n"
+            "    raise RuntimeError('boom')\n"
+        )
+        with self.assertRaises(ConfigError):
+            self._load(source)
+
+    def test_constructor_errors_become_config_error(self) -> None:
+        source = (
+            "from osprey.core.task import Task\n\n"
+            "class Boom(Task):\n"
+            "    def __init__(self):\n"
+            "        raise RuntimeError('ctor')\n\n"
+            "    def step(self, ctx):\n"
+            "        pass\n"
+        )
+        with self.assertRaises(ConfigError):
+            self._load(source)
+
     def test_broken_import_raises_config_error(self) -> None:
         with temp_dir() as folder:
             path = os.path.join(folder, "broken.py")

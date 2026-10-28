@@ -26,6 +26,8 @@ class Safety:
     ) -> None:
         if max_runtime is not None and max_runtime <= 0:
             raise ValueError("max_runtime must be positive")
+        if isinstance(abort_keys, str):
+            abort_keys = (abort_keys,)
         self.abort_keys: Tuple[str, ...] = tuple(abort_keys)
 
         from ..input.win32 import resolve_key

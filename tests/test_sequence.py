@@ -104,6 +104,17 @@ class TestSequence(unittest.TestCase):
         self.assertIn("no steps", stats.stop_reason or "")
 
 
+    def test_press_counts_as_action(self) -> None:
+        with temp_dir() as folder:
+            plan = Plan(
+                base_dir=folder,
+                steps=[Step("press", key="enter", wait=0.01)],
+            ).validate()
+            source = FakeScreen(lambda: make_frame(sample_template()))
+            stats, _controller = self._run(plan, source)
+        self.assertEqual(stats.stop_reason, "plan finished")
+        self.assertEqual(stats.actions, 1)
+
     def test_assets_dir_override_is_used(self) -> None:
         template = sample_template(seed=33)
         with temp_dir() as plan_dir, temp_dir() as assets_dir:

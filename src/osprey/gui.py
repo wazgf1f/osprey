@@ -210,6 +210,7 @@ class PlanEditor:
         self.steps: List[Step] = []
         self._safety = None
         self._running = False
+        self._closing = False
         self._log_handler: Optional[_LogHandler] = None
 
         self._build()
@@ -523,6 +524,15 @@ class PlanEditor:
         thread = threading.Thread(target=self._worker, args=(plan, live), daemon=True)
         thread.start()
 
+    def _post(self, callback, *args) -> None:
+        """Schedule UI work only while the window still exists."""
+        if self._closing:
+            return
+        try:
+            self.root.after(0, callback, *args)
+        except tk.TclError:
+            pass
+
     def _worker(self, plan: Plan, live: bool) -> None:
         try:
             engine = Engine(
@@ -531,9 +541,9 @@ class PlanEditor:
                 settings={"threshold": plan.threshold, "scales": plan.scales},
             )
             stats = engine.run(on_ready=self._on_ready)
-            self.root.after(0, self._finished, stats)
+            self._post(self._finished, stats)
         except Exception as exc:
-            self.root.after(0, self._failed, exc)
+            self._post(self._failed, exc)
 
     def _on_ready(self, ctx) -> None:
         self._safety = ctx.safety
@@ -611,6 +621,7 @@ class PlanEditor:
             if not messagebox.askyesno("仍在运行", "任务还在运行，停止并退出？", parent=self.root):
                 return
             self._stop()
+        self._closing = True
         if self._log_handler is not None:
             logging.getLogger("osprey").removeHandler(self._log_handler)
         self.root.destroy()
