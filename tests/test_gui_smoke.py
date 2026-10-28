@@ -37,6 +37,31 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
+    def test_store_template_reports_write_failure(self) -> None:
+        import tkinter as tk
+        from unittest import mock
+
+        import numpy as np
+
+        from osprey.capture.base import Frame
+        from osprey.gui import PlanEditor
+
+        try:
+            editor = PlanEditor()
+        except tk.TclError as exc:  # pragma: no cover - headless session
+            self.skipTest("no display available: %s" % exc)
+
+        try:
+            frame = Frame(np.zeros((40, 40, 4), dtype=np.uint8))
+            with mock.patch("osprey.gui.save_image", side_effect=OSError("denied")):
+                with mock.patch("osprey.gui.messagebox.showerror") as show:
+                    result = editor._store_template(frame, 0, 0, 10, 10)
+            self.assertIsNone(result)
+            self.assertTrue(show.called)
+        finally:
+            logging.getLogger("osprey").removeHandler(editor._log_handler)
+            editor.root.destroy()
+
     def test_editing_is_locked_while_running(self) -> None:
         import tkinter as tk
 

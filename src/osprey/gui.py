@@ -655,14 +655,9 @@ class PlanEditor:
             if right - left < 8 or bottom - top < 8:
                 overlay.destroy()
                 return
-            crop = frame.bgra[top:bottom, left:right]
-            rgb = np.ascontiguousarray(crop[..., 2::-1])
-            assets = os.path.join(self.base_dir, "assets")
-            os.makedirs(assets, exist_ok=True)
-            name = "click_%s.png" % datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            path = os.path.join(assets, name)
-            save_image(path, rgb)
-            state["path"] = path
+            path = self._store_template(frame, left, top, right, bottom)
+            if path:
+                state["path"] = path
             overlay.destroy()
 
         canvas.bind("<ButtonPress-1>", on_press)
@@ -675,6 +670,22 @@ class PlanEditor:
         self.root.deiconify()
         self.root.lift()
         return state.get("path")
+
+    def _store_template(self, frame, left: int, top: int, right: int, bottom: int) -> Optional[str]:
+        """Crop, save and report a template; None means the write failed."""
+        crop = frame.bgra[top:bottom, left:right]
+        rgb = np.ascontiguousarray(crop[..., 2::-1])
+        assets = os.path.join(self.base_dir, "assets")
+        try:
+            os.makedirs(assets, exist_ok=True)
+            name = "click_%s.png" % datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            path = os.path.join(assets, name)
+            save_image(path, rgb)
+        except OSError as exc:
+            messagebox.showerror(
+                "保存模板失败", "无法写入 %s：%s" % (assets, exc), parent=self.root)
+            return None
+        return path
 
     # -- run ---------------------------------------------------------------
     def _run(self, live: bool) -> None:

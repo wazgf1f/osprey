@@ -19,7 +19,19 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.1.0"
+
+
+def package_version() -> str:
+    """Read the single source of truth: osprey.__version__."""
+    init = ROOT / "src" / "osprey" / "__init__.py"
+    for line in init.read_text(encoding="utf-8").splitlines():
+        if line.startswith("__version__"):
+            return line.split("=", 1)[1].strip().strip("\"'")
+    raise SystemExit("could not read __version__ from %s" % init)
+
+
+# A release tag may override the package version for the installer only.
+VERSION = (os.environ.get("OSPREY_VERSION") or package_version()).lstrip("v")
 APP = ROOT / "dist" / "osprey"
 PAYLOAD = ROOT / "dist" / "payload"
 PORTABLE = ROOT / "dist" / ("Osprey-%s-win64-portable.zip" % VERSION)
@@ -162,8 +174,8 @@ try {
 try {
     $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Osprey"
     New-Item -Path $key -Force -ErrorAction Stop | Out-Null
-    Set-ItemProperty -Path $key -Name DisplayName -Value "Osprey 0.1.0"
-    Set-ItemProperty -Path $key -Name DisplayVersion -Value "0.1.0"
+    Set-ItemProperty -Path $key -Name DisplayName -Value "Osprey __VERSION__"
+    Set-ItemProperty -Path $key -Name DisplayVersion -Value "__VERSION__"
     Set-ItemProperty -Path $key -Name Publisher -Value "Zhaorui Chen"
     Set-ItemProperty -Path $key -Name InstallLocation -Value $Dest
     Set-ItemProperty -Path $key -Name DisplayIcon -Value $icon
@@ -227,11 +239,18 @@ def find_csc() -> Path:
     raise SystemExit("csc.exe (.NET Framework 4) was not found")
 
 
+def render_setup_source(version: str) -> str:
+    """Fill the installer UI's version strings from one value."""
+    return SETUP_SOURCE.read_text(encoding="utf-8").replace("0.1.0", version)
+
+
 def compile_stub() -> Path:
     BUILD.mkdir(parents=True, exist_ok=True)
     stub = BUILD / "osprey_setup_stub.exe"
     if stub.exists():
         stub.unlink()
+    rendered = BUILD / "setup_ui.versioned.cs"
+    rendered.write_text(render_setup_source(VERSION), encoding="utf-8")
     command = [
         str(find_csc()),
         "/nologo",
@@ -244,7 +263,7 @@ def compile_stub() -> Path:
         "/r:System.Windows.Forms.dll",
         "/r:System.IO.Compression.dll",
         "/r:System.IO.Compression.FileSystem.dll",
-        str(SETUP_SOURCE),
+        str(rendered),
     ]
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode != 0 or not stub.exists():

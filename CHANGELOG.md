@@ -49,6 +49,10 @@ Keep a Changelog, and the project uses semantic versioning.
 - `Safety` rejects non-finite `max_runtime` values.
 - Editing controls (capture, add, move, delete, open, save) are disabled while
   a run is active, so capture no longer hides the window mid-run.
+- Failing to write a captured template now shows an error dialog instead of
+  raising inside the Tk callback.
+- The installer version now comes from `osprey.__version__` (or
+  `OSPREY_VERSION`), including the uninstall registry entry.
 
 ## [0.1.0] - 2026-10-28
 
