@@ -29,6 +29,7 @@ from .capture.gdi import GdiGrabber
 from .core.engine import Engine, EngineConfig
 from .core.plan import Plan, Step
 from .core.sequence import SequenceTask
+from .ai.agent import OcrAgentTask
 from .errors import ConfigError
 from .vision.io import save_image
 from . import __version__
@@ -269,6 +270,81 @@ class StepDialog(tk.Toplevel):
         self.destroy()
 
 
+class AiDialog(tk.Toplevel):
+    """Text box for the DeepSeek goal plus an optional API key."""
+
+    def __init__(self, master: tk.Misc) -> None:
+        super().__init__(master)
+        self.title("AI 指令（OCR + DeepSeek）")
+        self.geometry("760x560")
+        self.minsize(620, 460)
+        self.transient(master)
+        self.result = None
+
+        frame = ttk.Frame(self, padding=14)
+        frame.pack(fill="both", expand=True)
+
+        ttk.Label(frame, text="给 DeepSeek 的指令").pack(anchor="w")
+        self.text = tk.Text(frame, height=7, wrap="word", font=(FONT, 10))
+        self.text.pack(fill="both", expand=True, pady=(6, 10))
+        self.text.insert("1.0", "打开 Windows 设置并点击“系统”")
+        self.text.focus_set()
+
+        ttk.Label(frame, text="DeepSeek API Key（留空则读取 DEEPSEEK_API_KEY）").pack(anchor="w")
+        self.key_var = tk.StringVar(value="")
+        ttk.Entry(frame, textvariable=self.key_var, show="*").pack(fill="x", pady=(4, 10))
+
+        row = ttk.Frame(frame)
+        row.pack(fill="x", pady=(0, 8))
+        ttk.Label(row, text="最多执行步数").pack(side="left")
+        self.steps_var = tk.StringVar(value="30")
+        ttk.Spinbox(row, from_=1, to=200, width=8,
+                    textvariable=self.steps_var).pack(side="left", padx=(8, 0))
+
+        ttk.Label(
+            frame,
+            text="识别默认使用 Windows 自带 OCR；可选 RapidOCR：pip install -e \".[ai]\"\n"
+                 "AI 只返回要点击的 OCR 元素，点击仍由 Osprey 执行。",
+            foreground=PALETTE["muted"],
+        ).pack(anchor="w", pady=(4, 10))
+
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x")
+        ttk.Button(buttons, text="取消", command=self._cancel).pack(side="right")
+        ttk.Button(buttons, text="真实运行", command=lambda: self._start(True)).pack(
+            side="right", padx=(0, 8))
+        ttk.Button(buttons, text="试运行", command=lambda: self._start(False)).pack(
+            side="right", padx=(0, 8))
+
+        self.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.update_idletasks()
+        self.wait_visibility()
+        self.grab_set()
+        self.focus_force()
+
+    def _start(self, live: bool) -> None:
+        goal = self.text.get("1.0", "end").strip()
+        if not goal:
+            messagebox.showwarning("没有指令", "先写一句要让 AI 完成的目标。", parent=self)
+            return
+        try:
+            steps = int(self.steps_var.get().strip())
+        except ValueError:
+            messagebox.showerror("步数无效", "最多执行步数必须是整数。", parent=self)
+            return
+        self.result = {
+            "goal": goal,
+            "api_key": self.key_var.get().strip() or None,
+            "max_steps": max(1, min(200, steps)),
+            "live": live,
+        }
+        self.destroy()
+
+    def _cancel(self) -> None:
+        self.result = None
+        self.destroy()
+
+
 class PlanEditor:
     def __init__(self, plan_path: Optional[str] = None) -> None:
         enable_dpi_awareness()
@@ -455,6 +531,7 @@ class PlanEditor:
             ("打开计划", self._open_dialog, 0),
             ("保存", self._save, 6),
             ("另存为", lambda: self._save(True), 6),
+            ("AI 指令…", self._open_ai, 6),
         ):
             button = ttk.Button(actions, text=label, command=command,
                                 style="Tool.TButton")
@@ -815,12 +892,47 @@ class PlanEditor:
         ):
             return
 
+        self._start_task(
+            SequenceTask(plan),
+            live,
+            {"threshold": plan.threshold, "scales": plan.scales, "all_screens": True},
+            plan.fps,
+            "运行中…" if not live else "真实运行中…",
+        )
+
+    def _start_task(self, task, live: bool, settings: dict,
+                    fps: float, label: str) -> None:
+        if self._running:
+            return
         self._stop_requested = False
         self._running = True
         self._set_running_buttons()
-        self._set_status("运行中…" if not live else "真实运行中…", kind="run")
-        thread = threading.Thread(target=self._worker, args=(plan, live), daemon=True)
+        self._set_status(label, kind="run")
+        thread = threading.Thread(
+            target=self._worker, args=(task, live, settings, fps), daemon=True)
         thread.start()
+
+    def _open_ai(self) -> None:
+        if self._running:
+            return
+        dialog = AiDialog(self.root)
+        self.root.wait_window(dialog)
+        result = dialog.result
+        if not result:
+            return
+        if result["live"] and not messagebox.askyesno(
+            "真实运行", "AI 会真实移动鼠标并点击。\n建议先试运行。\n继续吗？",
+            parent=self.root,
+        ):
+            return
+        self._start_task(
+            OcrAgentTask(api_key=result["api_key"]),
+            result["live"],
+            {"goal": result["goal"], "all_screens": True,
+             "ai_max_steps": result["max_steps"], "ai_tick_wait": 0.8},
+            1.0,
+            "AI 运行中…" if not result["live"] else "AI 真实运行中…",
+        )
 
     def _post(self, callback, *args) -> None:
         """Schedule UI work only while the window still exists."""
@@ -831,13 +943,12 @@ class PlanEditor:
         except tk.TclError:
             pass
 
-    def _worker(self, plan: Plan, live: bool) -> None:
+    def _worker(self, task, live: bool, settings: dict, fps: float) -> None:
         try:
             engine = Engine(
-                SequenceTask(plan),
-                config=EngineConfig(fps=plan.fps, dry_run=not live, abort_keys=("f12",)),
-                settings={"threshold": plan.threshold, "scales": plan.scales,
-                          "all_screens": True},
+                task,
+                config=EngineConfig(fps=fps, dry_run=not live, abort_keys=("f12",)),
+                settings=settings,
             )
             stats = engine.run(on_ready=self._on_ready)
             self._post(self._finished, stats)

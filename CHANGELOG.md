@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.0.1] - 2026-10-28
+
+### Added
+
+- OCR + DeepSeek text-API agent (`osprey.ai`): OCR the frame, ask DeepSeek to
+  choose an element, then click it through the normal Context API.
+- Windows 10/11 built-in OCR backend (PowerShell + WinRT), so the installed
+  app works without extra Python packages. RapidOCR remains an optional extra.
+- Editor **AI 指令…** dialog with a multi-line instruction box, optional API
+  key field and dry/live runs.
+- `examples/ai_agent.py` and `examples/ai_agent.json`.
+
 ## [0.1.2] - 2026-10-28
 
 ### Added

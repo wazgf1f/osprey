@@ -12,7 +12,7 @@
 Osprey 不是一个必须整套接受的框架，而是一个小而完整、容易读也容易改的引擎：
 Python + NumPy + Pillow + Win32 API。
 
-状态：**0.1.2 alpha**，Windows 10/11，Python 3.9+。
+状态：**1.0.1 alpha**，Windows 10/11，Python 3.9+。
 
 ![Osprey 计划编辑器](docs/images/editor.png)
 
@@ -54,6 +54,7 @@ Python + NumPy + Pillow + Win32 API。
 | 安全 | 默认 dry-run、F12 随时中止、退出时释放按键和鼠标 |
 | 编辑器 | 拖框截模板、上下移动/编辑步骤、添加滑动、**复制步骤**、试运行/真实运行 |
 | 计划 | 声明式 JSON，每步可设置等待、阈值、超时、缩放和滑动坐标 |
+| AI | OCR + DeepSeek 文本 API 决策；内置 Windows OCR，可选 RapidOCR |
 | API | 极简 Task：setup / step / teardown，外加一个小状态机 |
 | 打包 | 自解压 Windows 安装包、便携版 zip，目标机器不需要 Python |
 
@@ -62,14 +63,14 @@ Python + NumPy + Pillow + Win32 API。
 ### 方式一：Windows 安装包（不需要 Python）
 
 从 [Releases](https://github.com/wazgf1f/osprey/releases) 下载
-**Osprey-0.1.2-Setup.exe**。
+**Osprey-1.0.1-Setup.exe**。
 
 安装器会先显示**使用须知**：必须勾选“我已阅读并同意”才能继续，安装路径可自定义。
 默认装到 <code>%LOCALAPPDATA%\Programs\Osprey</code>，并在桌面和开始菜单创建快捷方式。
 
-- **升级**：从 0.1.2 起，安装器会先解压到临时目录，再整体替换旧安装目录，
+- **升级**：从 1.0.1 起，安装器会先解压到临时目录，再整体替换旧安装目录，
   不会残留旧版本文件。升级前请先关闭正在运行的 Osprey。
-- **卸载**：设置 → 应用 → **Osprey 0.1.2**，或运行安装目录下的
+- **卸载**：设置 → 应用 → **Osprey 1.0.1**，或运行安装目录下的
   <code>uninstall.bat</code>。
 - **SmartScreen**：安装包没有代码签名，Windows 可能提示“未知发布者”，
   点 **更多信息 → 仍要运行**。
@@ -79,7 +80,7 @@ Python + NumPy + Pillow + Win32 API。
 
 ### 方式二：便携版
 
-解压 **Osprey-0.1.2-win64-portable.zip**，运行 <code>osprey.bat</code> 即可。
+解压 **Osprey-1.0.1-win64-portable.zip**，运行 <code>osprey.bat</code> 即可。
 
 ### 方式三：从源码安装
 
@@ -124,7 +125,7 @@ Python + NumPy + Pillow + Win32 API。
 
     osprey doctor
 
-    osprey 0.1.2
+    osprey 1.0.1
     python      : 3.12.14
     platform    : Windows-11-10.0.26300-SP0 (AMD64)
     numpy       : 2.3.5
@@ -153,6 +154,28 @@ find 的输出里既有相对截图的坐标，也有桌面坐标：
     x=1476 y=814 w=64 h=64 score=1.0000 scale=1.000 desktop=(1476,814)
 
 真正点击时用 <code>desktop=(x, y)</code>。
+
+### AI 指令框（OCR + DeepSeek）
+
+编辑器里有 **AI 指令…** 按钮，打开的对话框包含一个多行指令文本框、可选的
+DeepSeek API Key 和最大执行步数。
+
+![AI 指令框](docs/images/ai-dialog.png)
+
+1. 设置环境变量 <code>DEEPSEEK_API_KEY</code>，或直接把 Key 填进对话框。
+   对话框里的 Key 只用于本次运行，不会保存。
+2. 点 **AI 指令…**，输入例如“打开 Windows 设置并点击系统”。
+3. 先点 **试运行**，确认后点 **真实运行**。**F12** 或 **停止** 随时中止。
+4. OCR 默认使用 Windows 10/11 自带识别，安装好的 exe 不需要额外 Python 包；
+   想要备用后端可以安装 <code>.[ai]</code> 使用 RapidOCR。
+
+也可以用命令行跑同一个 Agent：
+
+    set DEEPSEEK_API_KEY=sk-...
+    osprey run examples/ai_agent.py --config examples/ai_agent.json --live
+
+注意：发给 DeepSeek 的是 OCR 出来的文字框，不是截图；模型只负责选元素 id，
+真正点击仍由 Osprey 的输入层完成。
 
 ### 计划文件
 

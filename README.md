@@ -14,7 +14,7 @@ Osprey is a small, readable engine and library rather than a framework you have
 to adopt wholesale. The core is plain Python on top of NumPy, Pillow and the
 Win32 API.
 
-Status: **0.1.2 alpha**, Windows 10/11, Python 3.9+.
+Status: **1.0.1 alpha**, Windows 10/11, Python 3.9+.
 
 ![The Osprey plan editor](docs/images/editor.png)
 
@@ -59,6 +59,7 @@ It is not:
 | Safety | Dry run by default, F12 abort anywhere, held keys/buttons released on exit |
 | Editor | Drag-to-capture templates, reorder/edit steps, add a drag step, **duplicate a step**, dry and live runs |
 | Plans | Declarative JSON plans with per-step waits, thresholds, timeouts, scales and drag points |
+| AI | OCR + DeepSeek text-API agent; built-in Windows OCR, optional RapidOCR |
 | API | Tiny Task interface: setup / step / teardown, plus a small state machine |
 | Packaging | Self-extracting Windows setup, portable zip, no Python required |
 
@@ -66,7 +67,7 @@ It is not:
 
 ### Windows installer (no Python required)
 
-Download **Osprey-0.1.2-Setup.exe** from
+Download **Osprey-1.0.1-Setup.exe** from
 [Releases](https://github.com/wazgf1f/osprey/releases).
 
 The installer shows the terms of use first: you must tick "I have read and
@@ -74,10 +75,10 @@ agree" to continue, and the install path is customisable. It installs to
 <code>%LOCALAPPDATA%\Programs\Osprey</code> and adds Desktop and Start Menu
 shortcuts.
 
-- **Upgrades:** from 0.1.2 the installer extracts to a staging directory and
+- **Upgrades:** from 1.0.1 the installer extracts to a staging directory and
   replaces the existing installation, so old files do not survive an update.
   Close Osprey before installing a new version.
-- **Uninstall:** Settings -> Apps -> **Osprey 0.1.2**, or run
+- **Uninstall:** Settings -> Apps -> **Osprey 1.0.1**, or run
   <code>uninstall.bat</code> from the install directory.
 - **SmartScreen:** the executable is unsigned, so Windows may warn about an
   unknown publisher. Choose **More info**, then **Run anyway**.
@@ -88,7 +89,7 @@ all consequences of use.
 
 ### Portable
 
-Unzip **Osprey-0.1.2-win64-portable.zip** and run <code>osprey.bat</code>.
+Unzip **Osprey-1.0.1-win64-portable.zip** and run <code>osprey.bat</code>.
 
 ### From source
 
@@ -139,7 +140,7 @@ Check the environment first:
 
     osprey doctor
 
-    osprey 0.1.2
+    osprey 1.0.1
     python      : 3.12.14
     platform    : Windows-11-10.0.26300-SP0 (AMD64)
     numpy       : 2.3.5
@@ -169,6 +170,30 @@ The find output contains frame-relative coordinates and the desktop coordinate:
     x=1476 y=814 w=64 h=64 score=1.0000 scale=1.000 desktop=(1476,814)
 
 Use the <code>desktop=(x, y)</code> value when clicking.
+
+### AI instruction box (OCR + DeepSeek)
+
+The editor has an **AI 指令…** button. It opens a dialog with a multi-line text
+box for the goal, an optional DeepSeek API key and a step limit.
+
+![AI instruction box](docs/images/ai-dialog.png)
+
+1. Set <code>DEEPSEEK_API_KEY</code> in the environment or paste a key into the
+   dialog. The dialog key is used for that run only and is not saved.
+2. Click **AI 指令…**, type an instruction such as
+   "open Windows Settings and click System".
+3. Use **试运行** first, then **真实运行**. **F12** or **停止** stops the agent.
+4. OCR uses the Windows 10/11 built-in engine, so the installed app needs no
+   extra Python packages. Install <code>.[ai]</code> for an optional RapidOCR
+   backend.
+
+The same agent runs from the CLI:
+
+    set DEEPSEEK_API_KEY=sk-...
+    osprey run examples/ai_agent.py --config examples/ai_agent.json --live
+
+The model receives OCR text boxes, not screenshots. It only chooses an element
+id; Osprey performs the click through the normal input layer.
 
 ### Plan file
 
