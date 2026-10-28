@@ -12,6 +12,9 @@ Keep a Changelog, and the project uses semantic versioning.
 
 ### Changed
 
+- Rewrote README.md and README.zh-CN.md as parallel English and Chinese guides,
+  including the step-duplication workflow, multi-monitor capture and 0.1.1
+  installer upgrades.
 - Redesigned the plan editor: dark header, consistent typography, two-row
   toolbar, striped steps table, dark log panel and a status indicator.
 - The editor captures across all monitors and runs plans with `all_screens`,
