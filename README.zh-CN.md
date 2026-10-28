@@ -6,7 +6,7 @@
 
 Osprey 不是一个必须整套接受的框架，而是一个小而完整的引擎：Python + NumPy + Pillow + Win32 API，代码量不大，容易读、容易改。
 
-状态：**0.1.0 alpha**，Windows 10/11，Python 3.9+。
+状态：**0.1.1 alpha**，Windows 10/11，Python 3.9+。
 
 第一次使用请看 [中文上手指南](docs/quickstart.zh-CN.md)，里面是从安装到跑通任务的完整步骤。
 
@@ -46,11 +46,11 @@ Osprey 不是一个必须整套接受的框架，而是一个小而完整的引�
 
 ### 方式一：安装包（不需要 Python）
 
-双击 Osprey-0.1.0-Setup.exe，安装器会先显示**使用须知**：必须勾选“我已阅读并同意”才能继续，安装路径可自定义。默认装到
+双击 Osprey-0.1.1-Setup.exe，安装器会先显示**使用须知**：必须勾选“我已阅读并同意”才能继续，安装路径可自定义。默认装到
 %LOCALAPPDATA%\Programs\Osprey，并在桌面和开始菜单创建快捷方式。
 
 使用须知中明确：本软件不用于任何形式的挂课、刷课、刷学习时长、代考或其他学术作弊；因使用本软件产生的一切后果由使用者自行承担。
-想免安装，解压 Osprey-0.1.0-win64-portable.zip，运行 osprey.bat 即可。
+想免安装，解压 Osprey-0.1.1-win64-portable.zip，运行 osprey.bat 即可。
 
 安装包没有代码签名，Windows SmartScreen 可能提示“未知发布者”，点
 **更多信息 → 仍要运行**。
@@ -84,7 +84,7 @@ osprey doctor
 ```
 
 ```
-osprey 0.1.0
+osprey 0.1.1
 python      : 3.12.14
 platform    : Windows-11-10.0.26300-SP0 (AMD64)
 numpy       : 2.3.5

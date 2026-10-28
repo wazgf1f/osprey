@@ -11,6 +11,7 @@ plan can be built visually and then run from the command line or scheduled.
 
 from __future__ import annotations
 
+import copy
 import ctypes
 import datetime
 import logging
@@ -333,6 +334,7 @@ class PlanEditor:
             ("上移", lambda: self._move(-1)),
             ("下移", lambda: self._move(1)),
             ("编辑", self._edit_selected),
+            ("复制步骤", self._duplicate_selected),
             ("删除", self._delete_selected),
         ):
             button = ttk.Button(secondary_row, text=label, command=command,
@@ -391,6 +393,7 @@ class PlanEditor:
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.bind("<Double-1>", lambda _event: self._edit_selected())
         self.tree.bind("<Delete>", lambda _event: self._delete_selected())
+        self.tree.bind("<Control-d>", lambda _event: self._duplicate_selected())
         self.tree.tag_configure("odd", background="#F7F9FC")
         self.tree.tag_configure("even", background=PALETTE["card"])
 
@@ -587,6 +590,17 @@ class PlanEditor:
         if dialog.value is not None:
             self.steps[index] = dialog.value
             self._refresh(select=index)
+
+    def _duplicate_selected(self) -> None:
+        if self._running:
+            return
+        index = self._selected()
+        if index is None:
+            return
+        duplicate = copy.deepcopy(self.steps[index])
+        self.steps.insert(index + 1, duplicate)
+        self._refresh(select=index + 1)
+        self._set_status("已复制第 %d 步" % (index + 1))
 
     def _delete_selected(self) -> None:
         if self._running:

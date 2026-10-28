@@ -11,7 +11,7 @@
 
 ## 1. 安装
 
-**用安装包**：双击 Osprey-0.1.0-Setup.exe，阅读使用须知并勾选同意，选择安装路径，完成后从开始菜单打开 Osprey。
+**用安装包**：双击 Osprey-0.1.1-Setup.exe，阅读使用须知并勾选同意，选择安装路径，完成后从开始菜单打开 Osprey。
 
 **从源码**：打开 PowerShell，进入项目目录：
 
@@ -57,7 +57,7 @@ osprey doctor
 正常输出类似：
 
 ```
-osprey 0.1.0
+osprey 0.1.1
 python      : 3.12.14
 platform    : Windows-11-10.0.26300-SP0 (AMD64)
 numpy       : 2.3.5

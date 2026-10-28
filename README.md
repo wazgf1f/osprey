@@ -6,7 +6,7 @@
 
 Osprey is a small engine and library, not a framework you have to adopt wholesale: a readable Python core on top of NumPy, Pillow and the Win32 API.
 
-Status: **0.1.0 alpha**, Windows 10/11, Python 3.9+.
+Status: **0.1.1 alpha**, Windows 10/11, Python 3.9+.
 
 ## Why this exists
 
@@ -44,13 +44,13 @@ It is not:
 
 ### Prebuilt (no Python required)
 
-Run Osprey-0.1.0-Setup.exe. The installer shows the terms of use first: you
+Run Osprey-0.1.1-Setup.exe. The installer shows the terms of use first: you
 must tick "I have read and agree" to continue, and the install path is
 customisable. It installs to %LOCALAPPDATA%\Programs\Osprey and adds Desktop
 and Start Menu shortcuts. The terms state that this software must not be used
 for attendance fraud, watch-time farming or any other academic dishonesty, and
 that the user accepts all consequences of use.
-For a portable copy, unzip Osprey-0.1.0-win64-portable.zip and run osprey.bat.
+For a portable copy, unzip Osprey-0.1.1-win64-portable.zip and run osprey.bat.
 
 The executable is unsigned, so SmartScreen may warn about an unknown publisher:
 choose **More info**, then **Run anyway**.
@@ -87,7 +87,7 @@ osprey doctor
 ```
 
 ```
-osprey 0.1.0
+osprey 0.1.1
 python      : 3.12.14
 platform    : Windows-11-10.0.26300-SP0 (AMD64)
 numpy       : 2.3.5

@@ -182,6 +182,37 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
+    def test_duplicate_selected_step(self) -> None:
+        import tkinter as tk
+
+        from osprey.core.plan import Step
+        from osprey.gui import PlanEditor
+
+        try:
+            editor = PlanEditor()
+        except tk.TclError as exc:  # pragma: no cover - headless session
+            self.skipTest("no display available: %s" % exc)
+
+        try:
+            original = Step("click", template="a.png", wait=1.5,
+                            threshold=0.9, scales=[1.0, 1.25])
+            editor.steps = [original, Step("wait", seconds=2.0)]
+            editor._refresh()
+            editor.tree.selection_set("0")
+            editor._duplicate_selected()
+            self.assertEqual(len(editor.steps), 3)
+            duplicate = editor.steps[1]
+            self.assertIsNot(duplicate, original)
+            self.assertEqual(duplicate.template, "a.png")
+            self.assertEqual(duplicate.wait, 1.5)
+            self.assertEqual(duplicate.threshold, 0.9)
+            self.assertEqual(duplicate.scales, [1.0, 1.25])
+            duplicate.scales.append(1.5)
+            self.assertEqual(original.scales, [1.0, 1.25])
+        finally:
+            logging.getLogger("osprey").removeHandler(editor._log_handler)
+            editor.root.destroy()
+
     def test_step_dialog_keeps_scales(self) -> None:
         import tkinter as tk
 

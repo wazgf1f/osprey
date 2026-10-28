@@ -3,7 +3,12 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
-## [Unreleased]
+## [0.1.1] - 2026-10-28
+
+### Added
+
+- Duplicate a selected step in the editor with "复制步骤" or Ctrl+D,
+  including its template, waits, threshold, timeout and scales.
 
 ### Changed
 
