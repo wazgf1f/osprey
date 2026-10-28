@@ -5,6 +5,11 @@ Keep a Changelog, and the project uses semantic versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Redesigned the plan editor: dark header, consistent typography, two-row
+  toolbar, striped steps table, dark log panel and a status indicator.
+
 ### Fixed
 
 - Dry runs no longer touch Win32 APIs on non-Windows platforms.

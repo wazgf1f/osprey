@@ -30,6 +30,7 @@ from .core.plan import Plan, Step
 from .core.sequence import SequenceTask
 from .errors import ConfigError
 from .vision.io import save_image
+from . import __version__
 from .win32util import enable_dpi_awareness
 
 logger = logging.getLogger("osprey.gui")
@@ -37,6 +38,22 @@ logger = logging.getLogger("osprey.gui")
 ACTION_LABELS = {"click": "点击", "move": "移动", "wait": "等待", "press": "按键"}
 LABEL_ACTIONS = {value: key for key, value in ACTION_LABELS.items()}
 MISSING_LABELS = {"stop": "找不到就停止", "skip": "找不到就跳过"}
+
+FONT = "Microsoft YaHei UI"
+MONO = "Consolas"
+PALETTE = {
+    "bg": "#F3F6FB",
+    "card": "#FFFFFF",
+    "ink": "#14213D",
+    "muted": "#6B7A90",
+    "accent": "#2563EB",
+    "accent_dark": "#1D4ED8",
+    "ok": "#16A34A",
+    "run": "#2563EB",
+    "err": "#DC2626",
+    "header": "#0E1B33",
+    "header_sub": "#9FB0CC",
+}
 
 
 def _as_float(var: tk.StringVar, label: str) -> float:
@@ -71,7 +88,7 @@ class _LogHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
-            self.callback(self.format(record))
+            self.callback(record.levelname, self.format(record))
         except Exception:
             pass
 
@@ -202,13 +219,16 @@ class PlanEditor:
         enable_dpi_awareness()
         self.root = tk.Tk()
         self.root.title("Osprey 计划编辑器")
-        self.root.geometry("1080x720")
-        self.root.minsize(880, 580)
+        self.root.geometry("1320x880")
+        self.root.minsize(1080, 760)
+        self.root.configure(bg=PALETTE["bg"])
+        self._apply_theme()
 
         self.plan_path: Optional[str] = None
         self.base_dir = os.getcwd()
         self.steps: List[Step] = []
         self._safety = None
+        self._input = None
         self._running = False
         self._closing = False
         self._log_handler: Optional[_LogHandler] = None
@@ -222,26 +242,81 @@ class PlanEditor:
             self._load_plan(Plan())
 
     # -- layout ------------------------------------------------------------
+    def _apply_theme(self) -> None:
+        style = ttk.Style(self.root)
+        for theme in ("vista", "clam"):
+            if theme in style.theme_names():
+                style.theme_use(theme)
+                break
+        style.configure(".", font=(FONT, 10), background=PALETTE["bg"], foreground=PALETTE["ink"])
+        style.configure("TButton", padding=(9, 5))
+        style.configure("Tool.TButton", padding=(10, 6))
+        style.configure("TLabelframe", background=PALETTE["bg"], borderwidth=0)
+        style.configure("TLabelframe.Label", background=PALETTE["bg"],
+                        foreground=PALETTE["muted"], font=(FONT, 10, "bold"))
+        style.configure("Steps.Treeview", rowheight=30, font=(FONT, 10),
+                        background=PALETTE["card"], fieldbackground=PALETTE["card"], borderwidth=0)
+        style.configure("Treeview.Heading", font=(FONT, 10, "bold"),
+                        foreground=PALETTE["muted"], background=PALETTE["bg"])
+        style.map("Steps.Treeview",
+                  background=[("selected", "#DBEAFE")],
+                  foreground=[("selected", PALETTE["ink"])])
+        style.configure("TEntry", padding=3)
+        style.configure("TCombobox", padding=3)
+
     def _build(self) -> None:
         self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(2, weight=3)
-        self.root.rowconfigure(4, weight=1)
+        self.root.rowconfigure(3, weight=3)
+        self.root.rowconfigure(5, weight=1)
 
-        toolbar = ttk.Frame(self.root, padding=(8, 8, 8, 4))
-        toolbar.grid(row=0, column=0, sticky="ew")
-        ttk.Button(toolbar, text="框选模板并添加点击",
-                   command=self._capture_step).pack(side="left")
-        ttk.Button(toolbar, text="添加点击", command=self._add_click).pack(side="left", padx=(6, 0))
-        ttk.Button(toolbar, text="添加等待", command=self._add_wait).pack(side="left", padx=(6, 0))
-        ttk.Button(toolbar, text="添加按键", command=self._add_press).pack(side="left", padx=(6, 0))
-        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8)
-        ttk.Button(toolbar, text="上移", command=lambda: self._move(-1)).pack(side="left")
-        ttk.Button(toolbar, text="下移", command=lambda: self._move(1)).pack(side="left", padx=(4, 0))
-        ttk.Button(toolbar, text="编辑", command=self._edit_selected).pack(side="left", padx=(4, 0))
-        ttk.Button(toolbar, text="删除", command=self._delete_selected).pack(side="left", padx=(4, 0))
+        header = tk.Canvas(self.root, bg=PALETTE["header"], height=86,
+                           highlightthickness=0, bd=0)
+        header.grid(row=0, column=0, sticky="ew")
+        header.create_text(20, 10, text="Osprey", anchor="nw", fill="#FFFFFF",
+                           font=(FONT, 18, "bold"))
+        header.create_text(22, 55, text="屏幕视觉自动化 · 点击顺序与间隔",
+                           anchor="nw", fill=PALETTE["header_sub"], font=(FONT, 9))
+        version_id = header.create_text(18, 18, text="v" + __version__,
+                                        anchor="ne", fill=PALETTE["header_sub"],
+                                        font=(FONT, 9))
+        header.bind("<Configure>",
+                    lambda event: header.coords(version_id, event.width - 18, 18))
 
-        settings = ttk.LabelFrame(self.root, text="计划设置", padding=8)
-        settings.grid(row=1, column=0, sticky="ew", padx=8)
+        toolbar = ttk.Frame(self.root, padding=(12, 10, 12, 2))
+        toolbar.grid(row=1, column=0, sticky="ew")
+
+        primary_row = ttk.Frame(toolbar)
+        primary_row.pack(fill="x")
+        capture = tk.Button(
+            primary_row, text="＋  框选模板并添加点击", command=self._capture_step,
+            bg=PALETTE["accent"], fg="white", activebackground=PALETTE["accent_dark"],
+            activeforeground="white", relief="flat", bd=0, padx=14, pady=7,
+            cursor="hand2", font=(FONT, 10, "bold"),
+        )
+        capture.pack(side="left")
+        for label, command in (
+            ("添加点击", self._add_click),
+            ("添加等待", self._add_wait),
+            ("添加按键", self._add_press),
+        ):
+            ttk.Button(primary_row, text=label, command=command,
+                       style="Tool.TButton").pack(side="left", padx=(6, 0))
+
+        secondary_row = ttk.Frame(toolbar)
+        secondary_row.pack(fill="x", pady=(6, 0))
+        ttk.Label(secondary_row, text="调整步骤", foreground=PALETTE["muted"]).pack(
+            side="left", padx=(2, 8))
+        for label, command in (
+            ("上移", lambda: self._move(-1)),
+            ("下移", lambda: self._move(1)),
+            ("编辑", self._edit_selected),
+            ("删除", self._delete_selected),
+        ):
+            ttk.Button(secondary_row, text=label, command=command,
+                       style="Tool.TButton").pack(side="left", padx=(0, 4))
+
+        settings = ttk.LabelFrame(self.root, text="计划设置", padding=10)
+        settings.grid(row=2, column=0, sticky="ew", padx=12, pady=(2, 0))
 
         self.name_var = tk.StringVar(value="plan")
         self.threshold_var = tk.StringVar(value="0.86")
@@ -260,71 +335,126 @@ class PlanEditor:
             column = 0
             for label, variable, width in fields:
                 ttk.Label(settings, text=label).grid(
-                    row=row_index, column=column, sticky="w", padx=(0, 3), pady=2)
+                    row=row_index, column=column, sticky="w", padx=(0, 4), pady=3)
                 ttk.Entry(settings, textvariable=variable, width=width).grid(
-                    row=row_index, column=column + 1, sticky="w", padx=(0, 16), pady=2)
+                    row=row_index, column=column + 1, sticky="w", padx=(0, 18), pady=3)
                 column += 2
-        ttk.Label(settings, text="找不到时").grid(row=1, column=4, sticky="w", padx=(0, 3), pady=2)
+        ttk.Label(settings, text="找不到时").grid(
+            row=1, column=4, sticky="w", padx=(0, 4), pady=3)
         ttk.Combobox(settings, values=list(MISSING_LABELS.values()), state="readonly",
                      textvariable=self.missing_var, width=14).grid(
-            row=1, column=5, sticky="w", pady=2)
+                         row=1, column=5, sticky="w", pady=3)
 
-        tree_frame = ttk.Frame(self.root, padding=(8, 8, 8, 4))
-        tree_frame.grid(row=2, column=0, sticky="nsew")
-        tree_frame.columnconfigure(0, weight=1)
-        tree_frame.rowconfigure(0, weight=1)
+        steps_frame = ttk.LabelFrame(self.root, text="步骤", padding=8)
+        steps_frame.grid(row=3, column=0, sticky="nsew", padx=12, pady=(8, 6))
+        steps_frame.columnconfigure(0, weight=1)
+        steps_frame.rowconfigure(0, weight=1)
 
         columns = ("no", "action", "target", "wait", "timeout")
-        self.tree = ttk.Treeview(tree_frame, columns=columns, show="headings", selectmode="browse")
-        headings = {"no": "#", "action": "动作", "target": "目标 / 按键", "wait": "之后等待", "timeout": "超时"}
-        widths = {"no": 46, "action": 80, "target": 420, "wait": 90, "timeout": 90}
+        self.tree = ttk.Treeview(steps_frame, columns=columns, show="headings",
+                                 selectmode="browse", style="Steps.Treeview")
+        headings = {"no": "#", "action": "动作", "target": "目标 / 按键",
+                    "wait": "之后等待", "timeout": "超时"}
+        widths = {"no": 46, "action": 90, "target": 430, "wait": 100, "timeout": 100}
         for column in columns:
             self.tree.heading(column, text=headings[column])
-            self.tree.column(column, width=widths[column], anchor="w" if column != "no" else "center")
+            self.tree.column(column, width=widths[column],
+                             anchor="w" if column != "no" else "center")
         self.tree.grid(row=0, column=0, sticky="nsew")
-        scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
+        scroll = ttk.Scrollbar(steps_frame, orient="vertical", command=self.tree.yview)
         scroll.grid(row=0, column=1, sticky="ns")
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.bind("<Double-1>", lambda _event: self._edit_selected())
+        self.tree.bind("<Delete>", lambda _event: self._delete_selected())
+        self.tree.tag_configure("odd", background="#F7F9FC")
+        self.tree.tag_configure("even", background=PALETTE["card"])
 
-        actions = ttk.Frame(self.root, padding=(8, 0, 8, 4))
-        actions.grid(row=3, column=0, sticky="ew")
-        ttk.Button(actions, text="打开计划", command=self._open_dialog).pack(side="left")
-        ttk.Button(actions, text="保存", command=self._save).pack(side="left", padx=(6, 0))
-        ttk.Button(actions, text="另存为", command=lambda: self._save(save_as=True)).pack(side="left", padx=(6, 0))
-        self.stop_button = ttk.Button(actions, text="停止", command=self._stop, state="disabled")
+        self.empty_hint = tk.Label(
+            steps_frame,
+            text="还没有步骤\n点左上角「框选模板并添加点击」开始",
+            bg=PALETTE["card"], fg=PALETTE["muted"], font=(FONT, 10), justify="center",
+        )
+        self.empty_hint.place(relx=0.5, rely=0.55, anchor="center")
+        self.empty_hint.lift()
+
+        actions = ttk.Frame(self.root, padding=(12, 0, 12, 6))
+        actions.grid(row=4, column=0, sticky="ew")
+        ttk.Button(actions, text="打开计划", command=self._open_dialog,
+                   style="Tool.TButton").pack(side="left")
+        ttk.Button(actions, text="保存", command=self._save,
+                   style="Tool.TButton").pack(side="left", padx=(6, 0))
+        ttk.Button(actions, text="另存为", command=lambda: self._save(True),
+                   style="Tool.TButton").pack(side="left", padx=(6, 0))
+        self.stop_button = ttk.Button(actions, text="■  停止", command=self._stop,
+                                      state="disabled", style="Tool.TButton")
         self.stop_button.pack(side="right")
-        self.live_button = ttk.Button(actions, text="真实运行", command=lambda: self._run(True))
-        self.live_button.pack(side="right", padx=(0, 6))
-        self.dry_button = ttk.Button(actions, text="试运行", command=lambda: self._run(False))
-        self.dry_button.pack(side="right", padx=(0, 6))
+        self.live_button = tk.Button(
+            actions, text="▶  真实运行", command=lambda: self._run(True),
+            bg=PALETTE["accent"], fg="white", activebackground=PALETTE["accent_dark"],
+            activeforeground="white", relief="flat", bd=0, padx=14, pady=6,
+            cursor="hand2", font=(FONT, 10, "bold"),
+        )
+        self.live_button.pack(side="right", padx=(0, 8))
+        self.dry_button = ttk.Button(actions, text="▷  试运行",
+                                     command=lambda: self._run(False), style="Tool.TButton")
+        self.dry_button.pack(side="right", padx=(0, 8))
 
-        log_frame = ttk.LabelFrame(self.root, text="日志", padding=4)
-        log_frame.grid(row=4, column=0, sticky="nsew", padx=8, pady=(0, 4))
+        log_frame = ttk.LabelFrame(self.root, text="日志", padding=6)
+        log_frame.grid(row=5, column=0, sticky="nsew", padx=12, pady=(0, 6))
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
-        self.log_text = tk.Text(log_frame, height=8, wrap="word", state="disabled")
+        self.log_text = tk.Text(
+            log_frame, height=6, wrap="word", state="disabled",
+            bg="#0B1220", fg="#CBD5E1", insertbackground="#CBD5E1",
+            relief="flat", bd=0, padx=8, pady=6, font=(MONO, 9),
+        )
         self.log_text.grid(row=0, column=0, sticky="nsew")
         log_scroll = ttk.Scrollbar(log_frame, orient="vertical", command=self.log_text.yview)
         log_scroll.grid(row=0, column=1, sticky="ns")
         self.log_text.configure(yscrollcommand=log_scroll.set)
+        self.log_text.tag_configure("WARNING", foreground="#FBBF24")
+        self.log_text.tag_configure("ERROR", foreground="#F87171")
+        self.log_text.tag_configure("DEBUG", foreground="#64748B")
+        self.log_text.configure(state="normal")
+        self.log_text.insert("end", "就绪 · 运行日志会显示在这里\n", "DEBUG")
+        self.log_text.configure(state="disabled")
+        self._log_empty = True
 
         self.status_var = tk.StringVar(value="就绪")
-        ttk.Label(self.root, textvariable=self.status_var, anchor="w", padding=(10, 0, 10, 6)).grid(
-            row=5, column=0, sticky="ew")
+        statusbar = tk.Frame(self.root, bg=PALETTE["card"], height=30)
+        statusbar.grid(row=6, column=0, sticky="ew")
+        statusbar.grid_propagate(False)
+        self.status_dot = tk.Label(statusbar, text="●", bg=PALETTE["card"],
+                                   fg=PALETTE["ok"], font=(FONT, 10))
+        self.status_dot.pack(side="left", padx=(12, 4))
+        tk.Label(statusbar, textvariable=self.status_var, bg=PALETTE["card"],
+                 fg=PALETTE["muted"], font=(FONT, 9)).pack(side="left")
+        tk.Label(statusbar, text="F12 急停   Ctrl+S 保存",
+                 bg=PALETTE["card"], fg="#9AA8BD", font=(FONT, 8)).pack(side="right", padx=12)
 
+        self.root.bind("<Control-s>", lambda _event: self._save())
+        self.root.bind("<Control-o>", lambda _event: self._open_dialog())
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _install_logging(self) -> None:
-        handler = _LogHandler(lambda message: self.root.after(0, self._append_log, message))
+        handler = _LogHandler(
+            lambda level, message: self.root.after(0, self._append_log, level, message)
+        )
         handler.setFormatter(logging.Formatter("%(asctime)s  %(message)s", "%H:%M:%S"))
         logging.getLogger("osprey").addHandler(handler)
         logging.getLogger("osprey").setLevel(logging.INFO)
         self._log_handler = handler
 
-    def _append_log(self, message: str) -> None:
+    def _append_log(self, level: str, message: str) -> None:
         self.log_text.configure(state="normal")
-        self.log_text.insert("end", message + "\n")
+        if getattr(self, "_log_empty", False):
+            self.log_text.delete("1.0", "end")
+            self._log_empty = False
+        tag = level if level in ("WARNING", "ERROR", "DEBUG") else None
+        if tag:
+            self.log_text.insert("end", message + "\n", tag)
+        else:
+            self.log_text.insert("end", message + "\n")
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
 
@@ -371,7 +501,13 @@ class PlanEditor:
                         step.describe_target(),
                         ("%.2f" % step.wait) if step.wait else "",
                         ("%.2f" % step.timeout) if step.timeout is not None else ""),
+                tags=("odd" if index % 2 else "even",),
             )
+        if self.steps:
+            self.empty_hint.place_forget()
+        else:
+            self.empty_hint.place(relx=0.5, rely=0.55, anchor="center")
+            self.empty_hint.lift()
         if select is not None and 0 <= select < len(self.steps):
             self.tree.selection_set(str(select))
             self.tree.see(str(select))
@@ -520,7 +656,7 @@ class PlanEditor:
 
         self._running = True
         self._set_running_buttons()
-        self._set_status("运行中…" if not live else "真实运行中…")
+        self._set_status("运行中…" if not live else "真实运行中…", kind="run")
         thread = threading.Thread(target=self._worker, args=(plan, live), daemon=True)
         thread.start()
 
@@ -547,15 +683,17 @@ class PlanEditor:
 
     def _on_ready(self, ctx) -> None:
         self._safety = ctx.safety
+        self._input = ctx.input
 
     def _stop(self) -> None:
         if self._safety is not None:
             self._safety.request_stop("stopped from the editor")
-            self._set_status("正在停止…")
+            self._set_status("正在停止…", kind="run")
 
     def _finished(self, stats) -> None:
         self._running = False
         self._safety = None
+        self._input = None
         self._set_running_buttons()
         self._set_status("完成：%d 步，%d 次动作，%s"
                          % (stats.ticks, stats.actions, stats.stop_reason or "结束"))
@@ -563,8 +701,9 @@ class PlanEditor:
     def _failed(self, exc: Exception) -> None:
         self._running = False
         self._safety = None
+        self._input = None
         self._set_running_buttons()
-        self._set_status("出错：%s" % exc)
+        self._set_status("出错：%s" % exc, kind="err")
         messagebox.showerror("运行失败", str(exc), parent=self.root)
 
     def _set_running_buttons(self) -> None:
@@ -613,8 +752,11 @@ class PlanEditor:
         self._set_status("已保存 %s" % self.plan_path)
 
     # -- misc --------------------------------------------------------------
-    def _set_status(self, text: str) -> None:
+    def _set_status(self, text: str, kind: str = "ok") -> None:
         self.status_var.set(text)
+        colors = {"ok": PALETTE["ok"], "run": PALETTE["run"],
+                  "err": PALETTE["err"], "idle": PALETTE["muted"]}
+        self.status_dot.configure(fg=colors.get(kind, PALETTE["ok"]))
 
     def _on_close(self) -> None:
         if self._running:
@@ -622,6 +764,12 @@ class PlanEditor:
                 return
             self._stop()
         self._closing = True
+        if self._input is not None:
+            try:
+                self._input.release_all()
+            except Exception:
+                pass
+            self._input = None
         if self._log_handler is not None:
             logging.getLogger("osprey").removeHandler(self._log_handler)
         self.root.destroy()
