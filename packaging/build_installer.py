@@ -195,7 +195,7 @@ def write_gbk(path: Path, text: str) -> None:
 
 
 def write_utf8_sig(path: Path, text: str) -> None:
-    path.write_text(text, encoding="utf-8-sig", newline="\r\n")
+    path.write_text(text.replace("__VERSION__", VERSION), encoding="utf-8-sig", newline="\r\n")
 
 
 def build_payload() -> None:

@@ -6,6 +6,8 @@ import importlib.util
 import pathlib
 import unittest
 
+from .helpers import temp_dir
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
@@ -22,6 +24,15 @@ class TestBuildInstaller(unittest.TestCase):
     def test_version_matches_package(self) -> None:
         module = load_build_installer()
         self.assertEqual(module.VERSION, module.package_version())
+
+    def test_shortcut_script_gets_version(self) -> None:
+        module = load_build_installer()
+        with temp_dir() as folder:
+            path = pathlib.Path(folder) / "shortcuts.ps1"
+            module.write_utf8_sig(path, 'DisplayVersion "__VERSION__"')
+            text = path.read_text(encoding="utf-8-sig")
+            self.assertIn(module.VERSION, text)
+            self.assertNotIn("__VERSION__", text)
 
     def test_render_replaces_installer_version(self) -> None:
         module = load_build_installer()

@@ -136,12 +136,16 @@ namespace OspreySetup
             }
             ProcessStartInfo info = new ProcessStartInfo(
                 "powershell",
-                "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\" -Dest \"" + dest + "\"");
+                "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"" + script + "\" -Dest \"" + dest + "\"");
             info.UseShellExecute = false;
             info.CreateNoWindow = true;
             using (Process process = Process.Start(info))
             {
-                process.WaitForExit();
+                // A stuck shortcut script must never block a completed install.
+                if (!process.WaitForExit(15000))
+                {
+                    try { process.Kill(); } catch { }
+                }
             }
         }
 
@@ -150,13 +154,64 @@ namespace OspreySetup
             Log("reading payload from " + Process.GetCurrentProcess().MainModule.FileName);
             byte[] payload = Payload.Read(Process.GetCurrentProcess().MainModule.FileName);
             Log("payload bytes: " + payload.Length.ToString());
-            Payload.Extract(payload, dest);
-            Log("extracted to " + dest);
+
+            string trimmed = dest.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string staging = trimmed + ".new-" + Process.GetCurrentProcess().Id;
+            string backup = trimmed + ".old-" + Process.GetCurrentProcess().Id;
+            try
+            {
+                if (Directory.Exists(staging))
+                {
+                    Directory.Delete(staging, true);
+                }
+                Payload.Extract(payload, staging);
+                Log("extracted to " + staging);
+
+                if (Directory.Exists(trimmed))
+                {
+                    if (Directory.Exists(backup))
+                    {
+                        Directory.Delete(backup, true);
+                    }
+                    Directory.Move(trimmed, backup);
+                }
+                Directory.Move(staging, trimmed);
+                try
+                {
+                    if (Directory.Exists(backup))
+                    {
+                        Directory.Delete(backup, true);
+                    }
+                }
+                catch
+                {
+                    // A leftover backup is harmless; the install is complete.
+                }
+                Log("installed to " + trimmed);
+            }
+            catch
+            {
+                // Roll the previous install back if the replacement failed.
+                if (!Directory.Exists(trimmed) && Directory.Exists(backup))
+                {
+                    try { Directory.Move(backup, trimmed); } catch { }
+                }
+                try
+                {
+                    if (Directory.Exists(staging))
+                    {
+                        Directory.Delete(staging, true);
+                    }
+                }
+                catch { }
+                throw;
+            }
+
             if (Environment.GetEnvironmentVariable("OSPREY_NO_SHORTCUTS") != "1")
             {
                 try
                 {
-                    CreateShortcuts(dest);
+                    CreateShortcuts(trimmed);
                 }
                 catch
                 {

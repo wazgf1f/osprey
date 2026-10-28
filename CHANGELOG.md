@@ -30,6 +30,10 @@ Keep a Changelog, and the project uses semantic versioning.
 
 ### Fixed
 
+- Installer upgrades extract into a staging directory and replace the install
+  directory, so an existing 0.1.0 install is actually updated to 0.1.1.
+- The shortcut/uninstall script receives the real version instead of
+  `__VERSION__`, and shortcut creation can no longer block the installer.
 - Dry runs no longer touch Win32 APIs on non-Windows platforms.
 - `click(x, y, move=False)` now jumps to the coordinates instead of clicking
   wherever the cursor already is.
