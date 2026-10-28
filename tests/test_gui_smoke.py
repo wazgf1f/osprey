@@ -8,6 +8,8 @@ import unittest
 
 from osprey.core.plan import Step
 
+from .helpers import temp_dir
+
 
 @unittest.skipUnless(sys.platform == "win32", "GUI smoke test runs on Windows")
 class TestGuiSmoke(unittest.TestCase):
@@ -33,6 +35,35 @@ class TestGuiSmoke(unittest.TestCase):
             editor.threshold_var.set("nope")
             with self.assertRaises(Exception):
                 editor._collect()
+        finally:
+            logging.getLogger("osprey").removeHandler(editor._log_handler)
+            editor.root.destroy()
+
+    def test_store_template_does_not_overwrite(self) -> None:
+        import os
+        import tkinter as tk
+
+        import numpy as np
+
+        from osprey.capture.base import Frame
+        from osprey.gui import PlanEditor
+
+        try:
+            editor = PlanEditor()
+        except tk.TclError as exc:  # pragma: no cover - headless session
+            self.skipTest("no display available: %s" % exc)
+
+        try:
+            frame = Frame(np.zeros((40, 40, 4), dtype=np.uint8))
+            with temp_dir() as folder:
+                editor.base_dir = folder
+                first = editor._store_template(frame, 0, 0, 10, 10)
+                second = editor._store_template(frame, 0, 0, 10, 10)
+                self.assertIsNotNone(first)
+                self.assertIsNotNone(second)
+                self.assertNotEqual(first, second)
+                self.assertTrue(os.path.exists(first))
+                self.assertTrue(os.path.exists(second))
         finally:
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()

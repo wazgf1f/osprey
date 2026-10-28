@@ -678,7 +678,7 @@ class PlanEditor:
         assets = os.path.join(self.base_dir, "assets")
         try:
             os.makedirs(assets, exist_ok=True)
-            name = "click_%s.png" % datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            name = "click_%s.png" % datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             path = os.path.join(assets, name)
             save_image(path, rgb)
         except OSError as exc:

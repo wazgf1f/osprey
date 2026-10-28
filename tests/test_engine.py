@@ -95,6 +95,34 @@ class TestEngine(unittest.TestCase):
         self.assertLess(stats.elapsed, 2.0)
         self.assertGreater(stats.ticks, 0)
 
+    def test_first_grab_failure_closes_owned_source(self) -> None:
+        from osprey.core.task import Task
+
+        class Noop(Task):
+            def step(self, ctx) -> None:
+                pass
+
+        class Exploding:
+            def __init__(self) -> None:
+                self.closed = False
+
+            def grab(self):
+                raise RuntimeError("no display")
+
+            def close(self) -> None:
+                self.closed = True
+
+        source = Exploding()
+        engine = Engine(
+            Noop(),
+            config=EngineConfig(abort_keys=(), dry_run=True),
+            controller=InputController(dry_run=True),
+        )
+        engine._default_source = lambda: source
+        with self.assertRaises(RuntimeError):
+            engine.run()
+        self.assertTrue(source.closed)
+
     def test_abort_key_string_is_not_split(self) -> None:
         self.assertEqual(EngineConfig(abort_keys="f12").abort_keys, ("f12",))
         mapped = EngineConfig.from_mapping({"abort_keys": "f12"})

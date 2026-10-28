@@ -53,6 +53,9 @@ Keep a Changelog, and the project uses semantic versioning.
   raising inside the Tk callback.
 - The installer version now comes from `osprey.__version__` (or
   `OSPREY_VERSION`), including the uninstall registry entry.
+- Captured template names include microseconds, so two captures in the same
+  second no longer overwrite each other.
+- The engine closes its owned frame source when the first grab fails.
 
 ## [0.1.0] - 2026-10-28
 

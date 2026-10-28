@@ -108,19 +108,23 @@ class Engine:
         source = self.source if self.source is not None else self._default_source()
         owns_source = self.source is None
 
-        safety = Safety(
-            abort_keys=cfg.abort_keys,
-            stop_file=cfg.stop_file,
-            max_runtime=cfg.max_runtime,
-        )
-        controller = self.controller or InputController(
-            dry_run=cfg.dry_run,
-            should_abort=safety.should_abort,
-            speed=cfg.speed,
-            move_mode=cfg.move_mode,
-        )
-
-        first_frame = source.grab()
+        try:
+            safety = Safety(
+                abort_keys=cfg.abort_keys,
+                stop_file=cfg.stop_file,
+                max_runtime=cfg.max_runtime,
+            )
+            controller = self.controller or InputController(
+                dry_run=cfg.dry_run,
+                should_abort=safety.should_abort,
+                speed=cfg.speed,
+                move_mode=cfg.move_mode,
+            )
+            first_frame = source.grab()
+        except BaseException:
+            if owns_source:
+                source.close()
+            raise
         ctx = Context(
             frame=first_frame,
             screen=source,
