@@ -309,7 +309,7 @@ class InputController:
         self.move_mode = move_mode
         self.history: List[str] = []
         self._rng = random.Random(seed)
-        self._held_keys: set = set()
+        self._held_keys: dict = {}
         self._held_buttons: set = set()
 
     # -- internals ---------------------------------------------------------
@@ -317,8 +317,10 @@ class InputController:
         if self.should_abort is not None and self.should_abort():
             raise Aborted("input cancelled by safety guard")
 
-    def _emit(self, description: str, *events: INPUT) -> None:
-        self._check_abort()
+    def _emit(self, description: str, *events: INPUT, force: bool = False) -> None:
+        # force=True is used by release_all: an abort must still release keys.
+        if not force:
+            self._check_abort()
         self.history.append(description)
         if self.dry_run or not events:
             return
@@ -458,12 +460,12 @@ class InputController:
     def key_down(self, key) -> None:
         vk = resolve_key(key)
         self._emit("key_down %s" % key, _key_event(vk, False))
-        self._held_keys.add(vk)
+        self._held_keys[vk] = key
 
     def key_up(self, key) -> None:
         vk = resolve_key(key)
         self._emit("key_up %s" % key, _key_event(vk, True))
-        self._held_keys.discard(vk)
+        self._held_keys.pop(vk, None)
 
     def press(self, key, *, presses: int = 1, interval: float = 0.05) -> None:
         if presses < 1:
@@ -494,16 +496,16 @@ class InputController:
 
     def release_all(self) -> None:
         """Best-effort release so an abort never leaves a key or button stuck."""
-        for key in list(self._held_keys):
+        for vk, label in list(self._held_keys.items()):
             try:
-                self._emit("key_up %s" % key, _key_event(key, True))
+                self._emit("key_up %s" % label, _key_event(vk, True), force=True)
             except Exception:
                 pass
-            self._held_keys.discard(key)
+            self._held_keys.pop(vk, None)
         for button in list(self._held_buttons):
             try:
                 down, up = self._BUTTONS[button]
-                self._emit("release %s" % button, _mouse_event(0, 0, 0, up))
+                self._emit("release %s" % button, _mouse_event(0, 0, 0, up), force=True)
             except Exception:
                 pass
             self._held_buttons.discard(button)

@@ -98,6 +98,13 @@ class TestDryRunInput(unittest.TestCase):
             controller.hold("a", 5.0)
         self.assertLess(time.monotonic() - started, 1.0)
 
+    def test_release_all_works_after_an_abort(self) -> None:
+        controller = InputController(dry_run=True)
+        controller.key_down("a")
+        controller.should_abort = lambda: True
+        controller.release_all()
+        self.assertIn("key_up a", controller.history)
+
     def test_release_all_is_safe_when_nothing_is_held(self) -> None:
         self.controller.release_all()
 

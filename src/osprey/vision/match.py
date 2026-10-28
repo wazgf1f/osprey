@@ -368,10 +368,13 @@ def match_template(
         scaled = gray_template if (height, width) == (base_h, base_w) else _resize(
             gray_template, (width, height)
         )
+        if float(scaled.std()) < 1e-6:
+            logger.debug("skipping scale %.3f: template has no contrast", scale)
+            continue
         prepared.append((scale, scaled))
     if not prepared:
         raise VisionError(
-            "no scale fits: template is %dx%d, image is %dx%d"
+            "no usable scale: template is %dx%d, image is %dx%d (flat or too large)"
             % (base_w, base_h, image_w, image_h)
         )
 

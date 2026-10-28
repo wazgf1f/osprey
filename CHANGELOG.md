@@ -21,6 +21,11 @@ Keep a Changelog, and the project uses semantic versioning.
 - Key-press steps are counted in run statistics.
 - Closing the editor mid-run no longer posts callbacks to a destroyed window.
 - Long key holds, typing and cursor glides can now be interrupted by the panic key.
+- Aborting a run now releases held keys and mouse buttons even though the safety
+  guard is already tripped.
+- Degenerate template scales (a flat 1x1 resize) are skipped instead of failing
+  the whole search.
+- Released keys keep their original name in the action history.
 
 ## [0.1.0] - 2026-10-28
 

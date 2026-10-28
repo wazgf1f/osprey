@@ -179,6 +179,16 @@ class TestMatchTemplate(unittest.TestCase):
         locations = {(d.x, d.y) for d in detections[:2]}
         self.assertEqual(locations, {(10, 10), (120, 60)})
 
+    def test_degenerate_scale_is_skipped(self) -> None:
+        image = self.rng.integers(0, 90, size=(200, 260), dtype=np.uint8)
+        template = self.rng.integers(80, 256, size=(24, 28), dtype=np.uint8)
+        paste(image, template, 90, 60)
+        detections = match_template(
+            image, template, threshold=0.9, scales=(1.0, 0.001), downscale=1
+        )
+        self.assertTrue(detections)
+        self.assertEqual((detections[0].x, detections[0].y), (90, 60))
+
     def test_multiscale_finds_scaled_template(self) -> None:
         base = self.rng.integers(0, 256, size=(14, 16), dtype=np.uint8)
         scaled = np.asarray(
