@@ -1,0 +1,6 @@
+# Local scratch created by the test helper and by permission probes.
+# Safe to delete; ignored so that git never descends into them.
+.tmp/
+mkdtemp_*/
+probe*/
+probe700_*/

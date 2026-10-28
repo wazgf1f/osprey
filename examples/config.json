@@ -1,0 +1,12 @@
+{
+  "threshold": 0.86,
+  "scales": [1.0, 0.9, 1.1],
+  "nms_iou": 0.3,
+  "fps": 6.0,
+  "dry_run": true,
+  "abort_keys": ["f12"],
+  "max_runtime": 600,
+  "speed": 1.0,
+  "move_mode": "absolute",
+  "assets_dir": "examples/assets"
+}

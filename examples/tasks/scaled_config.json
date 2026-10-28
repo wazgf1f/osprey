@@ -1,0 +1,9 @@
+{
+  "assets_dir": "examples/assets",
+  "threshold": 0.85,
+  "scales": [1.0, 1.25, 1.5],
+  "fps": 6,
+  "dry_run": true,
+  "max_runtime": 300,
+  "abort_keys": ["f12"]
+}

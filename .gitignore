@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local tooling / scratch
+.build/
+.permtest/
+demo_clicks.txt
+.deps/
+.tmp/
+screenshots/
+*.log
+demo_output.png
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

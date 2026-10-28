@@ -1,0 +1,639 @@
+"""Visual editor for click plans.
+
+Run with:
+
+    osprey gui
+    osprey gui my-plan.json
+
+The editor writes the same plan.json that "osprey play" understands, so a
+plan can be built visually and then run from the command line or scheduled.
+"""
+
+from __future__ import annotations
+
+import ctypes
+import datetime
+import logging
+import os
+import sys
+import threading
+import time
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+from typing import List, Optional
+
+import numpy as np
+
+from .capture.gdi import GdiGrabber
+from .core.engine import Engine, EngineConfig
+from .core.plan import Plan, Step
+from .core.sequence import SequenceTask
+from .errors import ConfigError
+from .vision.io import save_image
+from .win32util import enable_dpi_awareness
+
+logger = logging.getLogger("osprey.gui")
+
+ACTION_LABELS = {"click": "点击", "move": "移动", "wait": "等待", "press": "按键"}
+LABEL_ACTIONS = {value: key for key, value in ACTION_LABELS.items()}
+MISSING_LABELS = {"stop": "找不到就停止", "skip": "找不到就跳过"}
+
+
+def _as_float(var: tk.StringVar, label: str) -> float:
+    try:
+        return float(var.get().strip())
+    except ValueError as exc:
+        raise ConfigError("%s 必须是数字" % label) from exc
+
+
+def _as_int(var: tk.StringVar, label: str) -> int:
+    try:
+        return int(var.get().strip())
+    except ValueError as exc:
+        raise ConfigError("%s 必须是整数" % label) from exc
+
+
+def _as_scales(var: tk.StringVar) -> List[float]:
+    text = var.get().strip() or "1.0"
+    try:
+        values = [float(part) for part in text.replace("，", ",").split(",") if part.strip()]
+    except ValueError as exc:
+        raise ConfigError("缩放必须是逗号分隔的数字，例如 1.0,1.25,1.5") from exc
+    if not values or any(value <= 0 for value in values):
+        raise ConfigError("缩放必须是正数")
+    return values
+
+
+class _LogHandler(logging.Handler):
+    def __init__(self, callback) -> None:
+        super().__init__()
+        self.callback = callback
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self.callback(self.format(record))
+        except Exception:
+            pass
+
+
+class StepDialog(tk.Toplevel):
+    """Modal editor for one plan step."""
+
+    def __init__(self, master: tk.Misc, step: Step) -> None:
+        super().__init__(master)
+        self.title("编辑步骤")
+        self.resizable(False, False)
+        self.transient(master)
+        self.value: Optional[Step] = None
+
+        self.action = tk.StringVar(value=step.action)
+        self.template = tk.StringVar(value=step.template)
+        self.key = tk.StringVar(value=step.key)
+        self.seconds = tk.StringVar(value=("%.2f" % step.seconds) if step.seconds else "1.00")
+        self.wait = tk.StringVar(value=("%.2f" % step.wait) if step.wait else "0.00")
+        self.timeout = tk.StringVar(value="" if step.timeout is None else "%.2f" % step.timeout)
+        self.threshold = tk.StringVar(value="" if step.threshold is None else "%.2f" % step.threshold)
+        self.missing = tk.StringVar(
+            value="" if step.on_missing is None else MISSING_LABELS.get(step.on_missing, "使用计划默认")
+        )
+
+        frame = ttk.Frame(self, padding=12)
+        frame.grid(row=0, column=0, sticky="nsew")
+
+        ttk.Label(frame, text="动作").grid(row=0, column=0, sticky="w", pady=4)
+        combo = ttk.Combobox(frame, values=list(ACTION_LABELS.values()), state="readonly",
+                             textvariable=self._action_label())
+        combo.grid(row=0, column=1, columnspan=2, sticky="ew", pady=4)
+        combo.bind("<<ComboboxSelected>>", lambda _event: self._sync())
+
+        ttk.Label(frame, text="模板").grid(row=1, column=0, sticky="w", pady=4)
+        self.template_entry = ttk.Entry(frame, textvariable=self.template, width=42)
+        self.template_entry.grid(row=1, column=1, sticky="ew", pady=4)
+        self.browse_button = ttk.Button(frame, text="浏览…", command=self._browse)
+        self.browse_button.grid(row=1, column=2, padx=(6, 0), pady=4)
+
+        ttk.Label(frame, text="按键").grid(row=2, column=0, sticky="w", pady=4)
+        self.key_entry = ttk.Entry(frame, textvariable=self.key, width=18)
+        self.key_entry.grid(row=2, column=1, sticky="w", pady=4)
+
+        ttk.Label(frame, text="等待秒数").grid(row=3, column=0, sticky="w", pady=4)
+        self.seconds_entry = ttk.Entry(frame, textvariable=self.seconds, width=10)
+        self.seconds_entry.grid(row=3, column=1, sticky="w", pady=4)
+
+        ttk.Label(frame, text="动作后等待").grid(row=4, column=0, sticky="w", pady=4)
+        ttk.Entry(frame, textvariable=self.wait, width=10).grid(row=4, column=1, sticky="w", pady=4)
+
+        ttk.Label(frame, text="超时（秒）").grid(row=5, column=0, sticky="w", pady=4)
+        ttk.Entry(frame, textvariable=self.timeout, width=10).grid(row=5, column=1, sticky="w", pady=4)
+
+        ttk.Label(frame, text="阈值").grid(row=6, column=0, sticky="w", pady=4)
+        ttk.Entry(frame, textvariable=self.threshold, width=10).grid(row=6, column=1, sticky="w", pady=4)
+
+        ttk.Label(frame, text="找不到时").grid(row=7, column=0, sticky="w", pady=4)
+        ttk.Combobox(frame, values=["使用计划默认", "找不到就停止", "找不到就跳过"],
+                     state="readonly", textvariable=self.missing, width=16).grid(
+            row=7, column=1, sticky="w", pady=4)
+
+        buttons = ttk.Frame(frame)
+        buttons.grid(row=8, column=0, columnspan=3, sticky="e", pady=(12, 0))
+        ttk.Button(buttons, text="取消", command=self._cancel).pack(side="right")
+        ttk.Button(buttons, text="确定", command=self._ok).pack(side="right", padx=(0, 6))
+
+        frame.columnconfigure(1, weight=1)
+        self._sync()
+        self.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.update_idletasks()
+        self.wait_visibility()
+        self.grab_set()
+        self.focus_force()
+
+    def _action_label(self) -> tk.StringVar:
+        # Combobox shows Chinese labels; keep a separate var for display.
+        if not hasattr(self, "_label_var"):
+            self._label_var = tk.StringVar(value=ACTION_LABELS.get(self.action.get(), "点击"))
+        return self._label_var
+
+    def _selected_action(self) -> str:
+        return LABEL_ACTIONS.get(self._label_var.get(), "click")
+
+    def _sync(self) -> None:
+        action = self._selected_action()
+        state = "normal" if action in ("click", "move") else "disabled"
+        self.template_entry.configure(state=state)
+        self.browse_button.configure(state=state)
+        self.key_entry.configure(state="normal" if action == "press" else "disabled")
+        self.seconds_entry.configure(state="normal" if action == "wait" else "disabled")
+
+    def _browse(self) -> None:
+        path = filedialog.askopenfilename(
+            parent=self, title="选择模板图片",
+            filetypes=[("PNG 图片", "*.png"), ("所有文件", "*.*")],
+        )
+        if path:
+            self.template.set(path)
+
+    def _ok(self) -> None:
+        action = self._selected_action()
+        try:
+            step = Step(
+                action=action,
+                template=self.template.get().strip(),
+                key=self.key.get().strip(),
+                seconds=_as_float(self.seconds, "等待秒数") if action == "wait" else 0.0,
+                wait=_as_float(self.wait, "动作后等待"),
+                threshold=_as_float(self.threshold, "阈值") if self.threshold.get().strip() else None,
+                timeout=_as_float(self.timeout, "超时") if self.timeout.get().strip() else None,
+                on_missing={"找不到就停止": "stop", "找不到就跳过": "skip"}.get(self.missing.get()),
+            )
+            step.validate(0)
+        except ConfigError as exc:
+            messagebox.showerror("步骤有误", str(exc), parent=self)
+            return
+        self.value = step
+        self.destroy()
+
+    def _cancel(self) -> None:
+        self.value = None
+        self.destroy()
+
+
+class PlanEditor:
+    def __init__(self, plan_path: Optional[str] = None) -> None:
+        enable_dpi_awareness()
+        self.root = tk.Tk()
+        self.root.title("Osprey 计划编辑器")
+        self.root.geometry("1080x720")
+        self.root.minsize(880, 580)
+
+        self.plan_path: Optional[str] = None
+        self.base_dir = os.getcwd()
+        self.steps: List[Step] = []
+        self._safety = None
+        self._running = False
+        self._log_handler: Optional[_LogHandler] = None
+
+        self._build()
+        self._install_logging()
+
+        if plan_path:
+            self._open_path(plan_path)
+        else:
+            self._load_plan(Plan())
+
+    # -- layout ------------------------------------------------------------
+    def _build(self) -> None:
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(2, weight=3)
+        self.root.rowconfigure(4, weight=1)
+
+        toolbar = ttk.Frame(self.root, padding=(8, 8, 8, 4))
+        toolbar.grid(row=0, column=0, sticky="ew")
+        ttk.Button(toolbar, text="框选模板并添加点击",
+                   command=self._capture_step).pack(side="left")
+        ttk.Button(toolbar, text="添加点击", command=self._add_click).pack(side="left", padx=(6, 0))
+        ttk.Button(toolbar, text="添加等待", command=self._add_wait).pack(side="left", padx=(6, 0))
+        ttk.Button(toolbar, text="添加按键", command=self._add_press).pack(side="left", padx=(6, 0))
+        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8)
+        ttk.Button(toolbar, text="上移", command=lambda: self._move(-1)).pack(side="left")
+        ttk.Button(toolbar, text="下移", command=lambda: self._move(1)).pack(side="left", padx=(4, 0))
+        ttk.Button(toolbar, text="编辑", command=self._edit_selected).pack(side="left", padx=(4, 0))
+        ttk.Button(toolbar, text="删除", command=self._delete_selected).pack(side="left", padx=(4, 0))
+
+        settings = ttk.LabelFrame(self.root, text="计划设置", padding=8)
+        settings.grid(row=1, column=0, sticky="ew", padx=8)
+
+        self.name_var = tk.StringVar(value="plan")
+        self.threshold_var = tk.StringVar(value="0.86")
+        self.timeout_var = tk.StringVar(value="8")
+        self.fps_var = tk.StringVar(value="6")
+        self.loop_var = tk.StringVar(value="1")
+        self.scales_var = tk.StringVar(value="1.0")
+        self.missing_var = tk.StringVar(value="找不到就停止")
+
+        rows = (
+            (("名称", self.name_var, 16), ("阈值", self.threshold_var, 6),
+             ("超时(秒)", self.timeout_var, 6), ("帧率", self.fps_var, 5)),
+            (("循环(0=无限)", self.loop_var, 5), ("缩放", self.scales_var, 12)),
+        )
+        for row_index, fields in enumerate(rows):
+            column = 0
+            for label, variable, width in fields:
+                ttk.Label(settings, text=label).grid(
+                    row=row_index, column=column, sticky="w", padx=(0, 3), pady=2)
+                ttk.Entry(settings, textvariable=variable, width=width).grid(
+                    row=row_index, column=column + 1, sticky="w", padx=(0, 16), pady=2)
+                column += 2
+        ttk.Label(settings, text="找不到时").grid(row=1, column=4, sticky="w", padx=(0, 3), pady=2)
+        ttk.Combobox(settings, values=list(MISSING_LABELS.values()), state="readonly",
+                     textvariable=self.missing_var, width=14).grid(
+            row=1, column=5, sticky="w", pady=2)
+
+        tree_frame = ttk.Frame(self.root, padding=(8, 8, 8, 4))
+        tree_frame.grid(row=2, column=0, sticky="nsew")
+        tree_frame.columnconfigure(0, weight=1)
+        tree_frame.rowconfigure(0, weight=1)
+
+        columns = ("no", "action", "target", "wait", "timeout")
+        self.tree = ttk.Treeview(tree_frame, columns=columns, show="headings", selectmode="browse")
+        headings = {"no": "#", "action": "动作", "target": "目标 / 按键", "wait": "之后等待", "timeout": "超时"}
+        widths = {"no": 46, "action": 80, "target": 420, "wait": 90, "timeout": 90}
+        for column in columns:
+            self.tree.heading(column, text=headings[column])
+            self.tree.column(column, width=widths[column], anchor="w" if column != "no" else "center")
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
+        scroll.grid(row=0, column=1, sticky="ns")
+        self.tree.configure(yscrollcommand=scroll.set)
+        self.tree.bind("<Double-1>", lambda _event: self._edit_selected())
+
+        actions = ttk.Frame(self.root, padding=(8, 0, 8, 4))
+        actions.grid(row=3, column=0, sticky="ew")
+        ttk.Button(actions, text="打开计划", command=self._open_dialog).pack(side="left")
+        ttk.Button(actions, text="保存", command=self._save).pack(side="left", padx=(6, 0))
+        ttk.Button(actions, text="另存为", command=lambda: self._save(save_as=True)).pack(side="left", padx=(6, 0))
+        self.stop_button = ttk.Button(actions, text="停止", command=self._stop, state="disabled")
+        self.stop_button.pack(side="right")
+        self.live_button = ttk.Button(actions, text="真实运行", command=lambda: self._run(True))
+        self.live_button.pack(side="right", padx=(0, 6))
+        self.dry_button = ttk.Button(actions, text="试运行", command=lambda: self._run(False))
+        self.dry_button.pack(side="right", padx=(0, 6))
+
+        log_frame = ttk.LabelFrame(self.root, text="日志", padding=4)
+        log_frame.grid(row=4, column=0, sticky="nsew", padx=8, pady=(0, 4))
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(0, weight=1)
+        self.log_text = tk.Text(log_frame, height=8, wrap="word", state="disabled")
+        self.log_text.grid(row=0, column=0, sticky="nsew")
+        log_scroll = ttk.Scrollbar(log_frame, orient="vertical", command=self.log_text.yview)
+        log_scroll.grid(row=0, column=1, sticky="ns")
+        self.log_text.configure(yscrollcommand=log_scroll.set)
+
+        self.status_var = tk.StringVar(value="就绪")
+        ttk.Label(self.root, textvariable=self.status_var, anchor="w", padding=(10, 0, 10, 6)).grid(
+            row=5, column=0, sticky="ew")
+
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _install_logging(self) -> None:
+        handler = _LogHandler(lambda message: self.root.after(0, self._append_log, message))
+        handler.setFormatter(logging.Formatter("%(asctime)s  %(message)s", "%H:%M:%S"))
+        logging.getLogger("osprey").addHandler(handler)
+        logging.getLogger("osprey").setLevel(logging.INFO)
+        self._log_handler = handler
+
+    def _append_log(self, message: str) -> None:
+        self.log_text.configure(state="normal")
+        self.log_text.insert("end", message + "\n")
+        self.log_text.see("end")
+        self.log_text.configure(state="disabled")
+
+    # -- plan state --------------------------------------------------------
+    def _load_plan(self, plan: Plan, path: Optional[str] = None) -> None:
+        self.plan_path = path
+        self.base_dir = plan.base_dir
+        self.steps = list(plan.steps)
+        self.name_var.set(plan.name)
+        self.threshold_var.set("%.2f" % plan.threshold)
+        self.timeout_var.set("%.2f" % plan.timeout)
+        self.fps_var.set("%.2f" % plan.fps)
+        self.loop_var.set(str(plan.loop))
+        self.scales_var.set(", ".join("%.2f" % value for value in plan.scales))
+        self.missing_var.set(MISSING_LABELS.get(plan.on_missing, "找不到就停止"))
+        self._refresh()
+        if path:
+            self._set_status("已加载 %s" % path)
+        else:
+            self._set_status("新计划：点左上角「框选模板并添加点击」开始")
+
+    def _collect(self) -> Plan:
+        plan = Plan(
+            name=self.name_var.get().strip() or "plan",
+            steps=list(self.steps),
+            threshold=_as_float(self.threshold_var, "阈值"),
+            timeout=_as_float(self.timeout_var, "超时"),
+            fps=_as_float(self.fps_var, "帧率"),
+            loop=_as_int(self.loop_var, "循环"),
+            on_missing={"找不到就停止": "stop", "找不到就跳过": "skip"}.get(
+                self.missing_var.get(), "stop"),
+            scales=_as_scales(self.scales_var),
+            base_dir=self.base_dir,
+        )
+        return plan.validate()
+
+    def _refresh(self, select: Optional[int] = None) -> None:
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        for index, step in enumerate(self.steps):
+            self.tree.insert(
+                "", "end", iid=str(index),
+                values=(index + 1, ACTION_LABELS.get(step.action, step.action),
+                        step.describe_target(),
+                        ("%.2f" % step.wait) if step.wait else "",
+                        ("%.2f" % step.timeout) if step.timeout is not None else ""),
+            )
+        if select is not None and 0 <= select < len(self.steps):
+            self.tree.selection_set(str(select))
+            self.tree.see(str(select))
+
+    def _selected(self) -> Optional[int]:
+        selection = self.tree.selection()
+        return int(selection[0]) if selection else None
+
+    # -- editing -----------------------------------------------------------
+    def _add_click(self) -> None:
+        path = filedialog.askopenfilename(
+            title="选择模板图片",
+            filetypes=[("PNG 图片", "*.png"), ("所有文件", "*.*")],
+        )
+        if not path:
+            return
+        self.steps.append(Step("click", template=os.path.abspath(path), wait=1.0))
+        self._refresh(select=len(self.steps) - 1)
+
+    def _add_wait(self) -> None:
+        self.steps.append(Step("wait", seconds=1.0))
+        self._refresh(select=len(self.steps) - 1)
+
+    def _add_press(self) -> None:
+        self.steps.append(Step("press", key="enter", wait=0.5))
+        self._refresh(select=len(self.steps) - 1)
+
+    def _edit_selected(self) -> None:
+        index = self._selected()
+        if index is None:
+            return
+        dialog = StepDialog(self.root, self.steps[index])
+        self.root.wait_window(dialog)
+        if dialog.value is not None:
+            self.steps[index] = dialog.value
+            self._refresh(select=index)
+
+    def _delete_selected(self) -> None:
+        index = self._selected()
+        if index is None:
+            return
+        del self.steps[index]
+        self._refresh(select=min(index, len(self.steps) - 1) if self.steps else None)
+
+    def _move(self, delta: int) -> None:
+        index = self._selected()
+        if index is None:
+            return
+        target = index + delta
+        if not 0 <= target < len(self.steps):
+            return
+        self.steps[index], self.steps[target] = self.steps[target], self.steps[index]
+        self._refresh(select=target)
+
+    # -- capture -----------------------------------------------------------
+    def _capture_step(self) -> None:
+        path = self._capture_template()
+        if not path:
+            return
+        self.steps.append(Step("click", template=path, wait=1.0))
+        self._refresh(select=len(self.steps) - 1)
+
+    def _capture_template(self) -> Optional[str]:
+        self.root.withdraw()
+        self.root.update_idletasks()
+        time.sleep(0.2)
+        try:
+            frame = GdiGrabber().grab()
+        except Exception as exc:
+            self.root.deiconify()
+            messagebox.showerror("截屏失败", str(exc), parent=self.root)
+            return None
+
+        overlay = tk.Toplevel(self.root)
+        overlay.overrideredirect(True)
+        overlay.geometry("%dx%d+%d+%d" % (frame.width, frame.height,
+                                          frame.origin[0], frame.origin[1]))
+        overlay.attributes("-topmost", True)
+        overlay.attributes("-alpha", 0.30)
+        overlay.configure(bg="black")
+        canvas = tk.Canvas(overlay, bg="black", cursor="cross", highlightthickness=0)
+        canvas.pack(fill="both", expand=True)
+
+        state = {"x0": 0, "y0": 0, "rect": None, "done": False}
+
+        def on_press(event):
+            state["x0"], state["y0"] = event.x, event.y
+            if state["rect"] is not None:
+                canvas.delete(state["rect"])
+            state["rect"] = canvas.create_rectangle(
+                event.x, event.y, event.x, event.y, outline="#00e0ff", width=2)
+
+        def on_drag(event):
+            if state["rect"] is not None:
+                canvas.coords(state["rect"], state["x0"], state["y0"], event.x, event.y)
+
+        def on_release(event):
+            x0, y0 = state["x0"], state["y0"]
+            x1, y1 = event.x, event.y
+            left, right = sorted((x0, x1))
+            top, bottom = sorted((y0, y1))
+            state["done"] = True
+            if right - left < 8 or bottom - top < 8:
+                overlay.destroy()
+                return
+            crop = frame.bgra[top:bottom, left:right]
+            rgb = np.ascontiguousarray(crop[..., 2::-1])
+            assets = os.path.join(self.base_dir, "assets")
+            os.makedirs(assets, exist_ok=True)
+            name = "click_%s.png" % datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            path = os.path.join(assets, name)
+            save_image(path, rgb)
+            state["path"] = path
+            overlay.destroy()
+
+        canvas.bind("<ButtonPress-1>", on_press)
+        canvas.bind("<B1-Motion>", on_drag)
+        canvas.bind("<ButtonRelease-1>", on_release)
+        overlay.bind("<Escape>", lambda _event: overlay.destroy())
+        overlay.focus_force()
+
+        self.root.wait_window(overlay)
+        self.root.deiconify()
+        self.root.lift()
+        return state.get("path")
+
+    # -- run ---------------------------------------------------------------
+    def _run(self, live: bool) -> None:
+        if self._running:
+            return
+        try:
+            plan = self._collect()
+        except ConfigError as exc:
+            messagebox.showerror("计划有误", str(exc), parent=self.root)
+            return
+        if not plan.steps:
+            messagebox.showwarning("没有步骤", "先用“框选模板并添加点击”加一个步骤。", parent=self.root)
+            return
+        if live and not messagebox.askyesno(
+            "真实运行", "会真实移动鼠标并点击。\n建议先试运行确认。\n继续吗？", parent=self.root
+        ):
+            return
+
+        self._running = True
+        self._set_running_buttons()
+        self._set_status("运行中…" if not live else "真实运行中…")
+        thread = threading.Thread(target=self._worker, args=(plan, live), daemon=True)
+        thread.start()
+
+    def _worker(self, plan: Plan, live: bool) -> None:
+        try:
+            engine = Engine(
+                SequenceTask(plan),
+                config=EngineConfig(fps=plan.fps, dry_run=not live, abort_keys=("f12",)),
+                settings={"threshold": plan.threshold, "scales": plan.scales},
+            )
+            stats = engine.run(on_ready=self._on_ready)
+            self.root.after(0, self._finished, stats)
+        except Exception as exc:
+            self.root.after(0, self._failed, exc)
+
+    def _on_ready(self, ctx) -> None:
+        self._safety = ctx.safety
+
+    def _stop(self) -> None:
+        if self._safety is not None:
+            self._safety.request_stop("stopped from the editor")
+            self._set_status("正在停止…")
+
+    def _finished(self, stats) -> None:
+        self._running = False
+        self._safety = None
+        self._set_running_buttons()
+        self._set_status("完成：%d 步，%d 次动作，%s"
+                         % (stats.ticks, stats.actions, stats.stop_reason or "结束"))
+
+    def _failed(self, exc: Exception) -> None:
+        self._running = False
+        self._safety = None
+        self._set_running_buttons()
+        self._set_status("出错：%s" % exc)
+        messagebox.showerror("运行失败", str(exc), parent=self.root)
+
+    def _set_running_buttons(self) -> None:
+        state = "disabled" if self._running else "normal"
+        self.dry_button.configure(state=state)
+        self.live_button.configure(state=state)
+        self.stop_button.configure(state="normal" if self._running else "disabled")
+
+    # -- files -------------------------------------------------------------
+    def _open_dialog(self) -> None:
+        path = filedialog.askopenfilename(
+            title="打开计划", filetypes=[("Osprey 计划", "*.json"), ("所有文件", "*.*")]
+        )
+        if path:
+            self._open_path(path)
+
+    def _open_path(self, path: str) -> None:
+        try:
+            plan = Plan.load(path)
+        except ConfigError as exc:
+            messagebox.showerror("无法打开", str(exc), parent=self.root)
+            return
+        self._load_plan(plan, path=os.path.abspath(path))
+
+    def _save(self, save_as: bool = False) -> None:
+        try:
+            plan = self._collect()
+        except ConfigError as exc:
+            messagebox.showerror("计划有误", str(exc), parent=self.root)
+            return
+        path = self.plan_path
+        if save_as or not path:
+            path = filedialog.asksaveasfilename(
+                title="保存计划", defaultextension=".json",
+                filetypes=[("Osprey 计划", "*.json")],
+            )
+            if not path:
+                return
+        try:
+            plan.save(path)
+        except OSError as exc:
+            messagebox.showerror("保存失败", str(exc), parent=self.root)
+            return
+        self.plan_path = os.path.abspath(path)
+        self.base_dir = os.path.dirname(self.plan_path)
+        self._set_status("已保存 %s" % self.plan_path)
+
+    # -- misc --------------------------------------------------------------
+    def _set_status(self, text: str) -> None:
+        self.status_var.set(text)
+
+    def _on_close(self) -> None:
+        if self._running:
+            if not messagebox.askyesno("仍在运行", "任务还在运行，停止并退出？", parent=self.root):
+                return
+            self._stop()
+        if self._log_handler is not None:
+            logging.getLogger("osprey").removeHandler(self._log_handler)
+        self.root.destroy()
+
+
+def _detach_console() -> None:
+    """Drop the console a double-clicked exe was given, so only the editor shows.
+
+    When launched from an existing terminal FreeConsole only detaches; the
+    terminal itself stays open.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        ctypes.windll.kernel32.FreeConsole()
+    except Exception:
+        pass
+
+
+def run_gui(plan_path: Optional[str] = None) -> int:
+    enable_dpi_awareness()
+    _detach_console()
+    editor = PlanEditor(plan_path)
+    editor.root.lift()
+    editor.root.attributes("-topmost", True)
+    editor.root.after(600, lambda: editor.root.attributes("-topmost", False))
+    editor.root.focus_force()
+    editor.root.mainloop()
+    return 0

@@ -1,0 +1,29 @@
+{
+  "name": "demo",
+  "threshold": 0.85,
+  "timeout": 3,
+  "fps": 6,
+  "loop": 1,
+  "on_missing": "skip",
+  "scales": [
+    1,
+    1.25,
+    1.5
+  ],
+  "steps": [
+    {
+      "action": "wait",
+      "seconds": 1
+    },
+    {
+      "action": "click",
+      "template": "assets/target.png",
+      "wait": 1
+    },
+    {
+      "action": "press",
+      "key": "esc",
+      "wait": 0.5
+    }
+  ]
+}
