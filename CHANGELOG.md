@@ -17,6 +17,8 @@ Keep a Changelog, and the project uses semantic versioning.
   them to strings and failing later at runtime.
 - `EngineConfig` and `Safety` validate `stop_file` (accepting `PathLike`)
   instead of raising `TypeError` on the first poll.
+- Plans built with `pathlib.Path` templates now serialize with `os.fspath`,
+  so saving no longer fails inside `json.dump`.
 
 ### Fixed
 

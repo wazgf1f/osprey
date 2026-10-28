@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import unittest
+from pathlib import Path
 
 from osprey.core.plan import Plan, Step
 from osprey.errors import ConfigError
@@ -161,6 +162,17 @@ class TestPlan(unittest.TestCase):
         with temp_dir() as folder:
             with self.assertRaises(ConfigError):
                 Plan.load(folder)
+
+    def test_path_template_round_trips(self) -> None:
+        with temp_dir() as folder:
+            plan = Plan(
+                base_dir=folder,
+                steps=[Step("click", template=Path("assets/a.png"))],
+            )
+            path = os.path.join(folder, "plan.json")
+            plan.save(path)
+            loaded = Plan.load(path)
+            self.assertEqual(loaded.steps[0].template, os.path.join("assets", "a.png"))
 
     def test_save_elsewhere_pins_relative_templates(self) -> None:
         with temp_dir() as source, temp_dir() as target:

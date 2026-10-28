@@ -151,7 +151,7 @@ class Step:
     def to_dict(self) -> Dict[str, Any]:
         data: Dict[str, Any] = {"action": self.action}
         if self.template:
-            data["template"] = self.template
+            data["template"] = os.fspath(self.template)
         if self.seconds:
             data["seconds"] = self.seconds
         if self.wait:
