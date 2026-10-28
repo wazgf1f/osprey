@@ -12,7 +12,7 @@
 Osprey 不是一个必须整套接受的框架，而是一个小而完整、容易读也容易改的引擎：
 Python + NumPy + Pillow + Win32 API。
 
-状态：**0.1.1 alpha**，Windows 10/11，Python 3.9+。
+状态：**0.1.2 alpha**，Windows 10/11，Python 3.9+。
 
 ![Osprey 计划编辑器](docs/images/editor.png)
 
@@ -49,10 +49,11 @@ Python + NumPy + Pillow + Win32 API。
 | 采集 | GDI DIB section 截屏，2560x1600 约 40 ms，支持区域截取、Per-Monitor DPI 感知、全桌面截取 |
 | 匹配 | FFT 归一化互相关、多尺度、由粗到精金字塔、NMS，可选 OpenCV |
 | 输入 | SendInput 扫描码、虚拟桌面绝对坐标、贝塞尔曲线拟人移动、Unicode 输入 |
+| 动作 | 点击、移动、等待、按键、滑动 |
 | 引擎 | 固定帧率循环、运行时长、急停键、停止文件、异常也保证清理、统计信息 |
 | 安全 | 默认 dry-run、F12 随时中止、退出时释放按键和鼠标 |
-| 编辑器 | 拖框截模板、上下移动/编辑步骤、**复制步骤**、试运行/真实运行 |
-| 计划 | 声明式 JSON，每步可设置等待、阈值、超时和缩放 |
+| 编辑器 | 拖框截模板、上下移动/编辑步骤、添加滑动、**复制步骤**、试运行/真实运行 |
+| 计划 | 声明式 JSON，每步可设置等待、阈值、超时、缩放和滑动坐标 |
 | API | 极简 Task：setup / step / teardown，外加一个小状态机 |
 | 打包 | 自解压 Windows 安装包、便携版 zip，目标机器不需要 Python |
 
@@ -61,14 +62,14 @@ Python + NumPy + Pillow + Win32 API。
 ### 方式一：Windows 安装包（不需要 Python）
 
 从 [Releases](https://github.com/wazgf1f/osprey/releases) 下载
-**Osprey-0.1.1-Setup.exe**。
+**Osprey-0.1.2-Setup.exe**。
 
 安装器会先显示**使用须知**：必须勾选“我已阅读并同意”才能继续，安装路径可自定义。
 默认装到 <code>%LOCALAPPDATA%\Programs\Osprey</code>，并在桌面和开始菜单创建快捷方式。
 
-- **升级**：从 0.1.1 起，安装器会先解压到临时目录，再整体替换旧安装目录，
+- **升级**：从 0.1.2 起，安装器会先解压到临时目录，再整体替换旧安装目录，
   不会残留旧版本文件。升级前请先关闭正在运行的 Osprey。
-- **卸载**：设置 → 应用 → **Osprey 0.1.1**，或运行安装目录下的
+- **卸载**：设置 → 应用 → **Osprey 0.1.2**，或运行安装目录下的
   <code>uninstall.bat</code>。
 - **SmartScreen**：安装包没有代码签名，Windows 可能提示“未知发布者”，
   点 **更多信息 → 仍要运行**。
@@ -78,7 +79,7 @@ Python + NumPy + Pillow + Win32 API。
 
 ### 方式二：便携版
 
-解压 **Osprey-0.1.1-win64-portable.zip**，运行 <code>osprey.bat</code> 即可。
+解压 **Osprey-0.1.2-win64-portable.zip**，运行 <code>osprey.bat</code> 即可。
 
 ### 方式三：从源码安装
 
@@ -105,12 +106,15 @@ Python + NumPy + Pillow + Win32 API。
 1. 点 **框选模板并添加点击**。编辑器会抓取全部显示器，把桌面压暗，拖一个框选中目标，
    截图会保存到计划旁边的 <code>assets/</code> 目录。
 2. 用 **添加点击 / 添加等待 / 添加按键** 继续加步骤。
-3. 选中一个步骤，点 **复制步骤**，或按 **Ctrl+D**。副本会插入到原步骤正下方，
-   并完整保留模板、等待、阈值、超时和每步缩放；副本是独立对象，改副本不会影响原步骤。
-4. 用 **上移 / 下移** 调整顺序，用 **编辑** 修改某一步。
-5. 在顶部设置计划名称、循环次数、阈值和缩放。
-6. 先点 **试运行** 确认，再点 **真实运行**。运行中按 **F12** 或点 **停止** 都能中止。
-7. 点 **保存** 写成 JSON 计划，之后用 <code>osprey play plan.json</code> 重复执行。
+3. 需要滑动时点 **添加滑动**，填写起点、终点（桌面坐标）、滑动时长和鼠标键。
+   运行时会先在起点按下，沿拟人轨迹拖到终点，再释放。
+4. 选中一个步骤，点 **复制步骤**，或按 **Ctrl+D**。副本会插入到原步骤正下方，
+   并完整保留模板、等待、阈值、超时、每步缩放和滑动坐标；副本是独立对象，
+   改副本不会影响原步骤。
+5. 用 **上移 / 下移** 调整顺序，用 **编辑** 修改某一步。
+6. 在顶部设置计划名称、循环次数、阈值和缩放。
+7. 先点 **试运行** 确认，再点 **真实运行**。运行中按 **F12** 或点 **停止** 都能中止。
+8. 点 **保存** 写成 JSON 计划，之后用 <code>osprey play plan.json</code> 重复执行。
 
 运行期间编辑器会锁定所有编辑按钮；真实运行中关闭窗口会先释放按住的键。
 
@@ -120,7 +124,7 @@ Python + NumPy + Pillow + Win32 API。
 
     osprey doctor
 
-    osprey 0.1.1
+    osprey 0.1.2
     python      : 3.12.14
     platform    : Windows-11-10.0.26300-SP0 (AMD64)
     numpy       : 2.3.5
@@ -172,7 +176,9 @@ find 的输出里既有相对截图的坐标，也有桌面坐标：
           "scales": [1.0, 1.25]
         },
         {"action": "wait", "seconds": 0.8},
-        {"action": "press", "key": "enter", "wait": 0.5}
+        {"action": "press", "key": "enter", "wait": 0.5},
+        {"action": "drag", "from": [300, 400], "to": [900, 400],
+         "duration": 0.5, "wait": 0.3}
       ]
     }
 
@@ -234,6 +240,7 @@ find 的输出里既有相对截图的坐标，也有桌面坐标：
 | <code>ctx.locate_all(...)</code> | 所有超过阈值的匹配 |
 | <code>ctx.wait_for(template, timeout=10)</code> | 阻塞等待目标出现 |
 | <code>ctx.click(target)</code> | 点击 Detection 或帧内坐标 |
+| <code>ctx.drag(start, end, duration=0.35, button="left")</code> | 按下、拖动、释放，完成一次滑动 |
 | <code>ctx.move(target)</code> | 把鼠标移过去 |
 | <code>ctx.sleep(seconds)</code> | 可中断的 sleep |
 | <code>ctx.snapshot(path)</code> | 存当前帧，方便调试 |

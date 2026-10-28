@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "osprey-automation"
-version = "0.1.1"
+version = "0.1.2"
 description = "Screen-vision automation engine for Windows: capture, detect, decide, act."
 readme = "README.md"
 requires-python = ">=3.9"

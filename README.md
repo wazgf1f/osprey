@@ -14,7 +14,7 @@ Osprey is a small, readable engine and library rather than a framework you have
 to adopt wholesale. The core is plain Python on top of NumPy, Pillow and the
 Win32 API.
 
-Status: **0.1.1 alpha**, Windows 10/11, Python 3.9+.
+Status: **0.1.2 alpha**, Windows 10/11, Python 3.9+.
 
 ![The Osprey plan editor](docs/images/editor.png)
 
@@ -54,10 +54,11 @@ It is not:
 | Capture | GDI DIB-section capture, ~40 ms for 2560x1600, region capture, per-monitor DPI awareness, all monitors as one frame |
 | Matching | FFT normalised cross-correlation, multi-scale, coarse-to-fine pyramid, NMS, OpenCV optional |
 | Input | SendInput scan codes, absolute mouse over the virtual desktop, humanised Bezier movement, Unicode typing |
+| Actions | Click, move, wait, key press and drag (slide/swipe) |
 | Engine | Fixed-FPS loop, duration cap, panic key, stop file, graceful teardown, statistics |
 | Safety | Dry run by default, F12 abort anywhere, held keys/buttons released on exit |
-| Editor | Drag-to-capture templates, reorder/edit steps, **duplicate a step**, dry and live runs |
-| Plans | Declarative JSON plans with per-step waits, thresholds, timeouts and scales |
+| Editor | Drag-to-capture templates, reorder/edit steps, add a drag step, **duplicate a step**, dry and live runs |
+| Plans | Declarative JSON plans with per-step waits, thresholds, timeouts, scales and drag points |
 | API | Tiny Task interface: setup / step / teardown, plus a small state machine |
 | Packaging | Self-extracting Windows setup, portable zip, no Python required |
 
@@ -65,7 +66,7 @@ It is not:
 
 ### Windows installer (no Python required)
 
-Download **Osprey-0.1.1-Setup.exe** from
+Download **Osprey-0.1.2-Setup.exe** from
 [Releases](https://github.com/wazgf1f/osprey/releases).
 
 The installer shows the terms of use first: you must tick "I have read and
@@ -73,10 +74,10 @@ agree" to continue, and the install path is customisable. It installs to
 <code>%LOCALAPPDATA%\Programs\Osprey</code> and adds Desktop and Start Menu
 shortcuts.
 
-- **Upgrades:** from 0.1.1 the installer extracts to a staging directory and
+- **Upgrades:** from 0.1.2 the installer extracts to a staging directory and
   replaces the existing installation, so old files do not survive an update.
   Close Osprey before installing a new version.
-- **Uninstall:** Settings -> Apps -> **Osprey 0.1.1**, or run
+- **Uninstall:** Settings -> Apps -> **Osprey 0.1.2**, or run
   <code>uninstall.bat</code> from the install directory.
 - **SmartScreen:** the executable is unsigned, so Windows may warn about an
   unknown publisher. Choose **More info**, then **Run anyway**.
@@ -87,7 +88,7 @@ all consequences of use.
 
 ### Portable
 
-Unzip **Osprey-0.1.1-win64-portable.zip** and run <code>osprey.bat</code>.
+Unzip **Osprey-0.1.2-win64-portable.zip** and run <code>osprey.bat</code>.
 
 ### From source
 
@@ -116,15 +117,18 @@ Read [DISCLAIMER.md](DISCLAIMER.md) before use.
    captures all monitors, dims the desktop and lets you drag a box around the
    target. The crop is saved under <code>assets/</code> next to the plan.
 2. Add more steps with **添加点击 / 添加等待 / 添加按键**.
-3. Select a step and click **复制步骤**, or press **Ctrl+D**, to duplicate it.
+3. For a swipe or drag, click **添加滑动** and set the start point, end point
+   (desktop coordinates), duration and mouse button. The engine presses at the
+   start, glides to the end with a humanised path, then releases.
+4. Select a step and click **复制步骤**, or press **Ctrl+D**, to duplicate it.
    The copy is inserted directly below the original and keeps its template,
-   waits, threshold, timeout and per-step scales. The two steps are independent,
-   so editing the copy does not change the original.
-4. Reorder with **上移 / 下移**, or edit a step with **编辑**.
-5. Set the plan name, loop count, threshold and scales at the top.
-6. Use **试运行** (dry run) first, then **真实运行** (live run). **F12** stops a
+   waits, threshold, timeout, per-step scales and drag points. The two steps are
+   independent, so editing the copy does not change the original.
+5. Reorder with **上移 / 下移**, or edit a step with **编辑**.
+6. Set the plan name, loop count, threshold and scales at the top.
+7. Use **试运行** (dry run) first, then **真实运行** (live run). **F12** stops a
    run; **停止** also works.
-7. **保存** writes a JSON plan. Run it later with <code>osprey play plan.json</code>.
+8. **保存** writes a JSON plan. Run it later with <code>osprey play plan.json</code>.
 
 The editor locks its editing buttons while a run is active, and releases held
 keys if you close it during a live run.
@@ -135,7 +139,7 @@ Check the environment first:
 
     osprey doctor
 
-    osprey 0.1.1
+    osprey 0.1.2
     python      : 3.12.14
     platform    : Windows-11-10.0.26300-SP0 (AMD64)
     numpy       : 2.3.5
@@ -189,7 +193,9 @@ the plan file's directory.
           "scales": [1.0, 1.25]
         },
         {"action": "wait", "seconds": 0.8},
-        {"action": "press", "key": "enter", "wait": 0.5}
+        {"action": "press", "key": "enter", "wait": 0.5},
+        {"action": "drag", "from": [300, 400], "to": [900, 400],
+         "duration": 0.5, "wait": 0.3}
       ]
     }
 
@@ -252,6 +258,7 @@ Everything a task touches hangs off the context:
 | <code>ctx.locate_all(...)</code> | Every detection above threshold |
 | <code>ctx.wait_for(template, timeout=10)</code> | Block until something appears |
 | <code>ctx.click(target)</code> | Click a detection or a frame-relative point |
+| <code>ctx.drag(start, end, duration=0.35, button="left")</code> | Press, glide and release a swipe |
 | <code>ctx.move(target)</code> | Glide the cursor there |
 | <code>ctx.sleep(seconds)</code> | Abortable sleep |
 | <code>ctx.snapshot(path)</code> | Save the current frame for debugging |

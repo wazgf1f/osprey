@@ -26,11 +26,11 @@ import json
 import math
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..errors import ConfigError
 
-ACTIONS = ("click", "move", "wait", "press")
+ACTIONS = ("click", "move", "wait", "press", "drag")
 MISSING_POLICIES = ("stop", "skip")
 
 
@@ -61,6 +61,18 @@ def _field_float(value: Any, name: str) -> float:
     if not math.isfinite(number):
         raise ConfigError("%s must be finite, got %r" % (name, value))
     return number
+
+
+def _point_value(value: Any, name: str) -> Optional[Tuple[float, float]]:
+    if value is None:
+        return None
+    if (isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple))
+            or len(value) != 2):
+        raise ConfigError("%s must be [x, y]" % name)
+    return (
+        _require_number(value[0], name + " x"),
+        _require_number(value[1], name + " y"),
+    )
 
 
 def _template_value(value: Any) -> Any:
@@ -99,6 +111,10 @@ class Step:
     seconds: float = 0.0
     wait: float = 0.0
     key: str = ""
+    start: Optional[Tuple[float, float]] = None
+    end: Optional[Tuple[float, float]] = None
+    duration: float = 0.35
+    button: str = "left"
     threshold: Optional[float] = None
     timeout: Optional[float] = None
     scales: Optional[List[float]] = None
@@ -118,6 +134,14 @@ class Step:
         if self.action == "wait":
             if self.seconds <= 0:
                 raise ConfigError("%s: wait needs seconds > 0" % where)
+        if self.action == "drag":
+            if self.start is None or self.end is None:
+                raise ConfigError("%s: drag needs from and to points" % where)
+            self.start = _point_value(self.start, where + " from")
+            self.end = _point_value(self.end, where + " to")
+            self.duration = _require_number(self.duration, where + " duration", minimum=0.01)
+            if self.button not in ("left", "right", "middle"):
+                raise ConfigError("%s: button must be left, right or middle" % where)
         if self.action == "press":
             if not self.key:
                 raise ConfigError("%s: press needs a key name" % where)
@@ -146,6 +170,9 @@ class Step:
             return "%.2f s" % self.seconds
         if self.action == "press":
             return self.key
+        if self.action == "drag" and self.start is not None and self.end is not None:
+            return "(%g,%g) → (%g,%g)" % (
+                self.start[0], self.start[1], self.end[0], self.end[1])
         return ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -158,6 +185,12 @@ class Step:
             data["wait"] = self.wait
         if self.key:
             data["key"] = self.key
+        if self.start is not None and self.end is not None:
+            data["from"] = [self.start[0], self.start[1]]
+            data["to"] = [self.end[0], self.end[1]]
+            data["duration"] = self.duration
+            if self.button != "left":
+                data["button"] = self.button
         if self.threshold is not None:
             data["threshold"] = self.threshold
         if self.timeout is not None:
@@ -180,6 +213,11 @@ class Step:
             seconds=_field_float(data.get("seconds", 0) or 0, "seconds"),
             wait=_field_float(data.get("wait", 0) or 0, "wait"),
             key=str(data.get("key", "") or ""),
+            start=_point_value(data.get("from"), "from"),
+            end=_point_value(data.get("to"), "to"),
+            duration=_field_float(data["duration"], "duration")
+            if data.get("duration") is not None else 0.35,
+            button=str(data.get("button", "left") or "left"),
             threshold=_field_float(data["threshold"], "threshold")
             if data.get("threshold") is not None else None,
             timeout=_field_float(data["timeout"], "timeout")

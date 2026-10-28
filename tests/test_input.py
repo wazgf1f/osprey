@@ -115,6 +115,25 @@ class TestDryRunInput(unittest.TestCase):
             controller.click(1, 2)
         self.assertEqual(controller.history, [])
 
+    def test_drag_records_down_move_up(self) -> None:
+        self.controller.drag(10, 10, 120, 60, duration=0.02)
+        self.assertTrue(any(entry.startswith("drag down") for entry in self.controller.history))
+        self.assertTrue(any(entry.startswith("drag up") for entry in self.controller.history))
+        self.assertEqual(self.controller._held_buttons, set())
+
+    def test_drag_releases_the_button_when_aborted(self) -> None:
+        calls = {"count": 0}
+
+        def guard() -> bool:
+            calls["count"] += 1
+            return calls["count"] > 2
+
+        controller = InputController(dry_run=True, should_abort=guard)
+        with self.assertRaises(Aborted):
+            controller.drag(10, 10, 120, 60, duration=0.2)
+        self.assertTrue(any(entry.startswith("drag up") for entry in controller.history))
+        self.assertEqual(controller._held_buttons, set())
+
     def test_hold_can_be_aborted(self) -> None:
         calls = {"count": 0}
 

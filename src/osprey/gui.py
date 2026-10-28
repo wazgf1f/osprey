@@ -36,7 +36,8 @@ from .win32util import enable_dpi_awareness
 
 logger = logging.getLogger("osprey.gui")
 
-ACTION_LABELS = {"click": "点击", "move": "移动", "wait": "等待", "press": "按键"}
+ACTION_LABELS = {"click": "点击", "move": "移动", "wait": "等待",
+                 "press": "按键", "drag": "滑动"}
 LABEL_ACTIONS = {value: key for key, value in ACTION_LABELS.items()}
 MISSING_LABELS = {"stop": "找不到就停止", "skip": "找不到就跳过"}
 
@@ -80,6 +81,17 @@ def _as_int(var: tk.StringVar, label: str) -> int:
         raise ConfigError("%s 必须是整数" % label) from exc
 
 
+def _as_point(var: tk.StringVar, label: str) -> tuple:
+    text = var.get().replace("，", ",").strip()
+    parts = [part.strip() for part in text.split(",")]
+    if len(parts) != 2:
+        raise ConfigError("%s 格式应为 x,y" % label)
+    try:
+        return (float(parts[0]), float(parts[1]))
+    except ValueError as exc:
+        raise ConfigError("%s 必须是两个数字，例如 100,200" % label) from exc
+
+
 def _as_scales(var: tk.StringVar) -> List[float]:
     text = var.get().strip() or "1.0"
     try:
@@ -117,6 +129,12 @@ class StepDialog(tk.Toplevel):
         self.action = tk.StringVar(value=step.action)
         self.template = tk.StringVar(value=step.template)
         self.key = tk.StringVar(value=step.key)
+        self.start_text = tk.StringVar(
+            value="" if step.start is None else "%g,%g" % step.start)
+        self.end_text = tk.StringVar(
+            value="" if step.end is None else "%g,%g" % step.end)
+        self.duration = tk.StringVar(value="%.2f" % step.duration)
+        self.button = tk.StringVar(value=step.button)
         self.seconds = tk.StringVar(value=("%.2f" % step.seconds) if step.seconds else "1.00")
         self.wait = tk.StringVar(value=("%.2f" % step.wait) if step.wait else "0.00")
         self.timeout = tk.StringVar(value="" if step.timeout is None else "%.2f" % step.timeout)
@@ -162,8 +180,23 @@ class StepDialog(tk.Toplevel):
                      state="readonly", textvariable=self.missing, width=16).grid(
             row=7, column=1, sticky="w", pady=4)
 
+        ttk.Label(frame, text="滑动起点 x,y").grid(row=8, column=0, sticky="w", pady=4)
+        self.start_entry = ttk.Entry(frame, textvariable=self.start_text, width=20)
+        self.start_entry.grid(row=8, column=1, sticky="w", pady=4)
+        ttk.Label(frame, text="滑动终点 x,y").grid(row=9, column=0, sticky="w", pady=4)
+        self.end_entry = ttk.Entry(frame, textvariable=self.end_text, width=20)
+        self.end_entry.grid(row=9, column=1, sticky="w", pady=4)
+        ttk.Label(frame, text="滑动时长（秒）").grid(row=10, column=0, sticky="w", pady=4)
+        self.duration_entry = ttk.Entry(frame, textvariable=self.duration, width=10)
+        self.duration_entry.grid(row=10, column=1, sticky="w", pady=4)
+        ttk.Label(frame, text="鼠标键").grid(row=11, column=0, sticky="w", pady=4)
+        self.button_combo = ttk.Combobox(
+            frame, values=["left", "right", "middle"], state="readonly",
+            textvariable=self.button, width=10)
+        self.button_combo.grid(row=11, column=1, sticky="w", pady=4)
+
         buttons = ttk.Frame(frame)
-        buttons.grid(row=8, column=0, columnspan=3, sticky="e", pady=(12, 0))
+        buttons.grid(row=12, column=0, columnspan=3, sticky="e", pady=(12, 0))
         ttk.Button(buttons, text="取消", command=self._cancel).pack(side="right")
         ttk.Button(buttons, text="确定", command=self._ok).pack(side="right", padx=(0, 6))
 
@@ -191,6 +224,10 @@ class StepDialog(tk.Toplevel):
         self.browse_button.configure(state=state)
         self.key_entry.configure(state="normal" if action == "press" else "disabled")
         self.seconds_entry.configure(state="normal" if action == "wait" else "disabled")
+        drag_state = "normal" if action == "drag" else "disabled"
+        for widget in (self.start_entry, self.end_entry, self.duration_entry):
+            widget.configure(state=drag_state)
+        self.button_combo.configure(state="readonly" if action == "drag" else "disabled")
 
     def _browse(self) -> None:
         path = filedialog.askopenfilename(
@@ -203,10 +240,16 @@ class StepDialog(tk.Toplevel):
     def _ok(self) -> None:
         action = self._selected_action()
         try:
+            start = _as_point(self.start_text, "滑动起点") if action == "drag" else None
+            end = _as_point(self.end_text, "滑动终点") if action == "drag" else None
             step = Step(
                 action=action,
                 template=self.template.get().strip(),
                 key=self.key.get().strip(),
+                start=start,
+                end=end,
+                duration=_as_float(self.duration, "滑动时长") if action == "drag" else 0.35,
+                button=self.button.get() or "left",
                 seconds=_as_float(self.seconds, "等待秒数") if action == "wait" else 0.0,
                 wait=_as_float(self.wait, "动作后等待"),
                 threshold=_as_float(self.threshold, "阈值") if self.threshold.get().strip() else None,
@@ -320,6 +363,7 @@ class PlanEditor:
             ("添加点击", self._add_click),
             ("添加等待", self._add_wait),
             ("添加按键", self._add_press),
+            ("添加滑动", self._add_drag),
         ):
             button = ttk.Button(primary_row, text=label, command=command,
                                 style="Tool.TButton")
@@ -578,6 +622,23 @@ class PlanEditor:
             return
         self.steps.append(Step("press", key="enter", wait=0.5))
         self._refresh(select=len(self.steps) - 1)
+
+    def _add_drag(self) -> None:
+        if self._running:
+            return
+        width = self.root.winfo_screenwidth()
+        height = self.root.winfo_screenheight()
+        dialog = StepDialog(self.root, Step(
+            "drag",
+            start=(int(width * 0.35), int(height * 0.50)),
+            end=(int(width * 0.65), int(height * 0.50)),
+            duration=0.4,
+            wait=0.5,
+        ))
+        self.root.wait_window(dialog)
+        if dialog.value is not None:
+            self.steps.append(dialog.value)
+            self._refresh(select=len(self.steps) - 1)
 
     def _edit_selected(self) -> None:
         if self._running:

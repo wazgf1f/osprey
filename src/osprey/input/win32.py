@@ -455,6 +455,28 @@ class InputController:
             if index < clicks - 1:
                 self._sleep(interval)
 
+    def drag(self, start_x: int, start_y: int, end_x: int, end_y: int, *,
+             duration: float = 0.35, button: str = "left") -> None:
+        """Press at the start point, glide to the end point, then release."""
+        if button not in self._BUTTONS:
+            raise ValueError("button must be one of %s" % (sorted(self._BUTTONS),))
+        duration = float(duration)
+        if not math.isfinite(duration) or duration < 0:
+            raise ValueError("duration must be a finite, non-negative number")
+        start_x, start_y = int(round(start_x)), int(round(start_y))
+        end_x, end_y = int(round(end_x)), int(round(end_y))
+        self.move_to(start_x, start_y, humanize=False)
+        down, up = self._BUTTONS[button]
+        self._emit("drag down %s %d,%d" % (button, start_x, start_y),
+                   _mouse_event(0, 0, 0, down))
+        self._held_buttons.add(button)
+        try:
+            self.move_to(end_x, end_y, duration=duration)
+        finally:
+            self._emit("drag up %s %d,%d" % (button, end_x, end_y),
+                       _mouse_event(0, 0, 0, up), force=True)
+            self._held_buttons.discard(button)
+
     def scroll(self, clicks: float, x: Optional[int] = None, y: Optional[int] = None) -> None:
         """Positive scrolls up, negative scrolls down."""
         if x is not None and y is not None:

@@ -114,6 +114,33 @@ class TestPlan(unittest.TestCase):
         with self.assertRaises(ConfigError):
             Plan(steps=[None]).validate()
 
+    def test_drag_round_trip(self) -> None:
+        plan = Plan(steps=[Step("drag", start=(10, 20), end=(300, 400),
+                                duration=0.5, button="right", wait=0.2)])
+        data = plan.to_dict()
+        step = data["steps"][0]
+        self.assertEqual(step["from"], [10, 20])
+        self.assertEqual(step["to"], [300, 400])
+        self.assertEqual(step["duration"], 0.5)
+        self.assertEqual(step["button"], "right")
+        loaded = Plan.from_dict(data)
+        self.assertEqual(loaded.steps[0].start, (10, 20))
+        self.assertEqual(loaded.steps[0].end, (300, 400))
+        self.assertEqual(loaded.steps[0].duration, 0.5)
+        self.assertEqual(loaded.steps[0].button, "right")
+
+    def test_drag_requires_points_and_valid_duration(self) -> None:
+        for step in (
+            {"action": "drag"},
+            {"action": "drag", "from": [1, 2]},
+            {"action": "drag", "from": [1, 2], "to": [3, 4], "duration": 0},
+            {"action": "drag", "from": [1, 2], "to": [3, 4], "button": "x"},
+            {"action": "drag", "from": [1], "to": [3, 4]},
+        ):
+            with self.subTest(step=step):
+                with self.assertRaises(ConfigError):
+                    Plan.from_dict({"steps": [step]})
+
     def test_template_must_be_a_path_string(self) -> None:
         for template in (123, ["a.png"], {"path": "a.png"}):
             with self.subTest(template=template):

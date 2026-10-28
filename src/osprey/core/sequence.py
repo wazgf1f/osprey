@@ -70,6 +70,12 @@ class SequenceTask(Task):
                 ctx.sleep(step.wait)
             return
 
+        if step.action == "drag":
+            ctx.drag(step.start, step.end, duration=step.duration, button=step.button)
+            if step.wait:
+                ctx.sleep(step.wait)
+            return
+
         template = self._resolve(step.template)
         detection = ctx.wait_for(
             template,

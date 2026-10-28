@@ -59,6 +59,20 @@ class TestSequence(unittest.TestCase):
         self.assertLess(controller.history.index(clicks[0]),
                         controller.history.index("key_down enter"))
 
+    def test_drag_step_moves_and_releases(self) -> None:
+        with temp_dir() as folder:
+            plan = Plan(
+                base_dir=folder,
+                steps=[Step("drag", start=(10, 10), end=(120, 80),
+                            duration=0.02, wait=0.01)],
+            ).validate()
+            source = FakeScreen(lambda: make_frame(sample_template()))
+            stats, controller = self._run(plan, source)
+        self.assertEqual(stats.stop_reason, "plan finished")
+        self.assertEqual(stats.actions, 1)
+        self.assertTrue(any(item.startswith("drag down") for item in controller.history))
+        self.assertTrue(any(item.startswith("drag up") for item in controller.history))
+
     def test_loop_two_passes(self) -> None:
         template = sample_template(seed=21)
         with temp_dir() as folder:

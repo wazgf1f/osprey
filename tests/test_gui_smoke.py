@@ -213,6 +213,31 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
+    def test_step_dialog_keeps_drag_fields(self) -> None:
+        import tkinter as tk
+
+        from osprey.core.plan import Step
+        from osprey.gui import PlanEditor, StepDialog
+
+        try:
+            editor = PlanEditor()
+        except tk.TclError as exc:  # pragma: no cover - headless session
+            self.skipTest("no display available: %s" % exc)
+
+        try:
+            step = Step("drag", start=(10, 20), end=(300, 400),
+                        duration=0.6, button="right")
+            dialog = StepDialog(editor.root, step)
+            dialog._ok()
+            self.assertIsNotNone(dialog.value)
+            self.assertEqual(dialog.value.start, (10, 20))
+            self.assertEqual(dialog.value.end, (300, 400))
+            self.assertEqual(dialog.value.duration, 0.6)
+            self.assertEqual(dialog.value.button, "right")
+        finally:
+            logging.getLogger("osprey").removeHandler(editor._log_handler)
+            editor.root.destroy()
+
     def test_step_dialog_keeps_scales(self) -> None:
         import tkinter as tk
 

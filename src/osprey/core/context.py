@@ -146,6 +146,13 @@ class Context:
         self.input.move_to(x, y, duration=duration)
         self.stats.actions += 1
 
+    def drag(self, start: Tuple[float, float], end: Tuple[float, float], *,
+             duration: float = 0.35, button: str = "left") -> None:
+        """Press at start, glide to end, then release."""
+        self.input.drag(start[0], start[1], end[0], end[1],
+                        duration=duration, button=button)
+        self.stats.actions += 1
+
     def sleep(self, seconds: float) -> None:
         """Abortable sleep; the panic key is checked every 20 ms."""
         seconds = float(seconds)

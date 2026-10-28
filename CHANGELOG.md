@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [0.1.2] - 2026-10-28
+
+### Added
+
+- Drag (slide/swipe) step: press at a start point, glide to the end point,
+  then release. Plans accept `from`, `to`, `duration` and `button`; the editor
+  exposes the same fields under "添加滑动".
+
 ## [0.1.1] - 2026-10-28
 
 ### Added
