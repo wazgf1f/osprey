@@ -39,6 +39,28 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
+    def test_capture_failure_restores_window(self) -> None:
+        import tkinter as tk
+        from unittest import mock
+
+        from osprey.gui import PlanEditor
+
+        try:
+            editor = PlanEditor()
+        except tk.TclError as exc:  # pragma: no cover - headless session
+            self.skipTest("no display available: %s" % exc)
+
+        try:
+            with mock.patch("osprey.gui.GdiGrabber", side_effect=RuntimeError("no gdi")):
+                with mock.patch("osprey.gui.messagebox.showerror") as show:
+                    result = editor._capture_template()
+            self.assertIsNone(result)
+            self.assertTrue(show.called)
+            self.assertNotEqual(editor.root.state(), "withdrawn")
+        finally:
+            logging.getLogger("osprey").removeHandler(editor._log_handler)
+            editor.root.destroy()
+
     def test_store_template_does_not_overwrite(self) -> None:
         import os
         import tkinter as tk

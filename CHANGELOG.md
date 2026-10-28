@@ -56,6 +56,8 @@ Keep a Changelog, and the project uses semantic versioning.
 - Captured template names include microseconds plus a numeric fallback, so two
   captures in the same clock tick no longer overwrite each other.
 - The engine closes its owned frame source when the first grab fails.
+- If screen capture cannot even be initialised, the editor restores itself and
+  shows an error instead of staying hidden.
 
 ## [0.1.0] - 2026-10-28
 
