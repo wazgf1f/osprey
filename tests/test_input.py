@@ -72,6 +72,12 @@ class TestDryRunInput(unittest.TestCase):
         self.assertGreater(len(moves), 3)
         self.assertEqual(moves[-1], "move 300,240")
 
+    def test_click_with_coords_and_no_humanize_moves(self) -> None:
+        self.controller.click(120, 80, move=False)
+        moves = [entry for entry in self.controller.history if entry.startswith("move ")]
+        self.assertEqual(moves[-1], "move 120,80")
+        self.assertTrue(any(entry.startswith("click left") for entry in self.controller.history))
+
     def test_abort_guard_prevents_everything(self) -> None:
         controller = InputController(dry_run=True, should_abort=lambda: True)
         with self.assertRaises(Aborted):

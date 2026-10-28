@@ -414,13 +414,18 @@ class InputController:
         interval: float = 0.07,
         move: bool = True,
     ) -> None:
-        """Click at (x, y), or wherever the cursor already is when omitted."""
+        """Click at (x, y), or wherever the cursor already is when omitted.
+
+        move=False keeps the requested coordinates but skips the humanised
+        glide, so the cursor jumps there instead of the coordinates being
+        silently ignored.
+        """
         if button not in self._BUTTONS:
             raise ValueError("button must be one of %s" % (sorted(self._BUTTONS),))
         if clicks < 1:
             raise ValueError("clicks must be at least 1")
-        if x is not None and y is not None and move:
-            self.move_to(x, y)
+        if x is not None and y is not None:
+            self.move_to(x, y, humanize=move)
 
         down, up = self._BUTTONS[button]
         for index in range(clicks):

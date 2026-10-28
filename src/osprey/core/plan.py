@@ -35,14 +35,38 @@ MISSING_POLICIES = ("stop", "skip")
 
 def _require_number(value: Any, name: str, *, minimum: float = 0.0,
                     maximum: Optional[float] = None) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, bool):
         raise ConfigError("%s must be a number, got %r" % (name, value))
-    number = float(value)
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError("%s must be a number, got %r" % (name, value)) from exc
     if number < minimum:
         raise ConfigError("%s must be >= %s, got %s" % (name, minimum, number))
     if maximum is not None and number > maximum:
         raise ConfigError("%s must be <= %s, got %s" % (name, maximum, number))
     return number
+
+
+def _field_float(value: Any, name: str) -> float:
+    if isinstance(value, bool):
+        raise ConfigError("%s must be a number, got %r" % (name, value))
+    try:
+        return float(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError("%s must be a number, got %r" % (name, value)) from exc
+
+
+def _field_int(value: Any, name: str) -> int:
+    if isinstance(value, bool):
+        raise ConfigError("%s must be an integer, got %r" % (name, value))
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError("%s must be an integer, got %r" % (name, value)) from exc
+    if number != int(number):
+        raise ConfigError("%s must be an integer, got %r" % (name, value))
+    return int(number)
 
 
 def _require_scales(value: Any) -> List[float]:
@@ -77,8 +101,15 @@ class Step:
         if self.action == "wait":
             if self.seconds <= 0:
                 raise ConfigError("%s: wait needs seconds > 0" % where)
-        if self.action == "press" and not self.key:
-            raise ConfigError("%s: press needs a key name" % where)
+        if self.action == "press":
+            if not self.key:
+                raise ConfigError("%s: press needs a key name" % where)
+            from ..input.win32 import resolve_key
+
+            try:
+                resolve_key(self.key)
+            except (TypeError, ValueError) as exc:
+                raise ConfigError("%s: invalid key %r" % (where, self.key)) from exc
         if self.wait < 0:
             raise ConfigError("%s: wait must not be negative" % where)
         if self.threshold is not None:
@@ -129,11 +160,13 @@ class Step:
         step = cls(
             action=str(data["action"]),
             template=str(data.get("template", "") or ""),
-            seconds=float(data.get("seconds", 0) or 0),
-            wait=float(data.get("wait", 0) or 0),
+            seconds=_field_float(data.get("seconds", 0) or 0, "seconds"),
+            wait=_field_float(data.get("wait", 0) or 0, "wait"),
             key=str(data.get("key", "") or ""),
-            threshold=data.get("threshold"),
-            timeout=data.get("timeout"),
+            threshold=_field_float(data["threshold"], "threshold")
+            if data.get("threshold") is not None else None,
+            timeout=_field_float(data["timeout"], "timeout")
+            if data.get("timeout") is not None else None,
             scales=data.get("scales"),
             on_missing=data.get("on_missing"),
         )
@@ -195,10 +228,10 @@ class Plan:
         plan = cls(
             name=str(data.get("name", "plan")),
             steps=[Step.from_dict(item, index) for index, item in enumerate(steps_data)],
-            threshold=float(data.get("threshold", 0.86)),
-            timeout=float(data.get("timeout", 8.0)),
-            fps=float(data.get("fps", 6.0)),
-            loop=int(data.get("loop", 1)),
+            threshold=_field_float(data.get("threshold", 0.86), "threshold"),
+            timeout=_field_float(data.get("timeout", 8.0), "timeout"),
+            fps=_field_float(data.get("fps", 6.0), "fps"),
+            loop=_field_int(data.get("loop", 1), "loop"),
             on_missing=str(data.get("on_missing", "stop")),
             scales=data.get("scales", [1.0]),
             base_dir=base_dir or os.getcwd(),

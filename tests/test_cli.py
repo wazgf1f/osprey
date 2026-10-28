@@ -76,6 +76,31 @@ class TestLoadTask(unittest.TestCase):
         with self.assertRaises(ConfigError):
             _load_task("definitely-not-here.py")
 
+    def test_task_can_import_a_sibling_module(self) -> None:
+        with temp_dir() as folder:
+            with open(os.path.join(folder, "helper.py"), "w", encoding="utf-8") as handle:
+                handle.write("VALUE = 7\n")
+            path = os.path.join(folder, "task_module.py")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(
+                    "from helper import VALUE\n"
+                    "from osprey.core.task import Task\n\n\n"
+                    "class Sibling(Task):\n"
+                    "    name = 'sibling-%d' % VALUE\n\n"
+                    "    def step(self, ctx):\n"
+                    "        pass\n"
+                )
+            task = _load_task(path)
+        self.assertEqual(task.name, "sibling-7")
+
+    def test_broken_import_raises_config_error(self) -> None:
+        with temp_dir() as folder:
+            path = os.path.join(folder, "broken.py")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("import module_that_does_not_exist_12345\n")
+            with self.assertRaises(ConfigError):
+                _load_task(path)
+
 
 if __name__ == "__main__":
     unittest.main()

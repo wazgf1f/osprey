@@ -437,12 +437,15 @@ class PlanEditor:
         self.root.withdraw()
         self.root.update_idletasks()
         time.sleep(0.2)
+        grabber = GdiGrabber()
         try:
-            frame = GdiGrabber().grab()
+            frame = grabber.grab()
         except Exception as exc:
             self.root.deiconify()
             messagebox.showerror("截屏失败", str(exc), parent=self.root)
             return None
+        finally:
+            grabber.close()
 
         overlay = tk.Toplevel(self.root)
         overlay.overrideredirect(True)

@@ -104,5 +104,28 @@ class TestSequence(unittest.TestCase):
         self.assertIn("no steps", stats.stop_reason or "")
 
 
+    def test_assets_dir_override_is_used(self) -> None:
+        template = sample_template(seed=33)
+        with temp_dir() as plan_dir, temp_dir() as assets_dir:
+            save_image(os.path.join(assets_dir, "t.png"), template)
+            plan = Plan(
+                base_dir=plan_dir,
+                steps=[Step("click", template="t.png", wait=0.05)],
+                threshold=0.85,
+            ).validate()
+            source = FakeScreen(lambda: make_frame(template, (30, 20)))
+            controller = InputController(dry_run=True)
+            engine = Engine(
+                SequenceTask(plan, assets_dir=assets_dir),
+                config=EngineConfig(fps=20, duration=2.0, abort_keys=()),
+                source=source,
+                controller=controller,
+                settings={"threshold": 0.85},
+            )
+            stats = engine.run()
+        self.assertEqual(stats.stop_reason, "plan finished")
+        self.assertTrue(any(item.startswith("click") for item in controller.history))
+
+
 if __name__ == "__main__":
     unittest.main()

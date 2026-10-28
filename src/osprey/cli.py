@@ -236,9 +236,19 @@ def _load_task(path: str) -> Task:
     spec = importlib.util.spec_from_file_location("osprey_user_task", path)
     if spec is None or spec.loader is None:
         raise ConfigError("cannot import %s" % path)
+    task_dir = os.path.dirname(os.path.abspath(path))
+    if task_dir not in sys.path:
+        sys.path.insert(0, task_dir)
+
     module = importlib.util.module_from_spec(spec)
     sys.modules["osprey_user_task"] = module
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        sys.modules.pop("osprey_user_task", None)
+        raise ConfigError(
+            "could not import %s: %s: %s" % (path, type(exc).__name__, exc)
+        ) from exc
 
     factory = getattr(module, "create_task", None)
     if callable(factory):

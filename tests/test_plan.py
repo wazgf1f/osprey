@@ -83,6 +83,51 @@ class TestPlan(unittest.TestCase):
         plan = Plan().validate()
         self.assertEqual(plan.steps, [])
 
+    def test_bad_field_types_raise_config_error(self) -> None:
+        cases = [
+            {"loop": "abc"},
+            {"loop": 1.5},
+            {"threshold": "high"},
+            {"timeout": "later"},
+            {"steps": [{"action": "wait", "seconds": "soon"}]},
+            {"steps": [{"action": "click", "template": "a.png", "wait": "soon"}]},
+        ]
+        for case in cases:
+            with self.subTest(case=case):
+                with self.assertRaises(ConfigError):
+                    Plan.from_dict(case)
+
+    def test_numeric_strings_are_accepted(self) -> None:
+        plan = Plan.from_dict({
+            "threshold": "0.9",
+            "loop": "2",
+            "steps": [{"action": "wait", "seconds": "1.5"}],
+        })
+        self.assertEqual(plan.threshold, 0.9)
+        self.assertEqual(plan.loop, 2)
+        self.assertEqual(plan.steps[0].seconds, 1.5)
+
+    def test_invalid_press_key_is_rejected_at_load(self) -> None:
+        with self.assertRaises(ConfigError):
+            Plan.from_dict({"steps": [{"action": "press", "key": "nope"}]})
+        plan = Plan.from_dict({"steps": [{"action": "press", "key": "enter"}]})
+        self.assertEqual(plan.steps[0].key, "enter")
+
+    def test_step_numeric_strings_are_accepted(self) -> None:
+        plan = Plan.from_dict({
+            "steps": [{
+                "action": "click",
+                "template": "a.png",
+                "threshold": "0.9",
+                "timeout": "3",
+                "scales": ["1.0", "1.25"],
+            }]
+        })
+        step = plan.steps[0]
+        self.assertEqual(step.threshold, 0.9)
+        self.assertEqual(step.timeout, 3.0)
+        self.assertEqual(step.scales, [1.0, 1.25])
+
     def test_missing_file_raises(self) -> None:
         with self.assertRaises(ConfigError):
             Plan.load("no-such-plan.json")

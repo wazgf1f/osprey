@@ -53,6 +53,11 @@ class SequenceTask(Task):
             else:
                 self.index = 0
 
+    def _resolve(self, template: str) -> str:
+        if os.path.isabs(template):
+            return template
+        return os.path.abspath(os.path.join(self.assets_dir, template))
+
     def _run_step(self, ctx, step: Step) -> None:
         if step.action == "wait":
             ctx.sleep(step.seconds)
@@ -64,7 +69,7 @@ class SequenceTask(Task):
                 ctx.sleep(step.wait)
             return
 
-        template = self.plan.resolve(step.template)
+        template = self._resolve(step.template)
         detection = ctx.wait_for(
             template,
             timeout=step.timeout if step.timeout is not None else self.plan.timeout,

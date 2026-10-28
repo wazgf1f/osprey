@@ -27,6 +27,14 @@ class Safety:
         if max_runtime is not None and max_runtime <= 0:
             raise ValueError("max_runtime must be positive")
         self.abort_keys: Tuple[str, ...] = tuple(abort_keys)
+
+        from ..input.win32 import resolve_key
+
+        for key in self.abort_keys:
+            try:
+                resolve_key(key)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("invalid abort key %r: %s" % (key, exc)) from exc
         self.stop_file = stop_file
         self.max_runtime = max_runtime
         self._started_at: Optional[float] = None
@@ -71,8 +79,8 @@ class Safety:
                 for key in self.abort_keys:
                     if is_key_pressed(key):
                         return "panic key pressed: %s" % key
-            except RuntimeError:
-                pass  # not on Windows; other guards still apply
+            except (RuntimeError, ValueError):
+                pass  # not on Windows, or already validated; other guards apply
 
         if self.max_runtime is not None and self._started_at is not None:
             if time.monotonic() - self._started_at >= self.max_runtime:

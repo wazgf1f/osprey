@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [Unreleased]
+
+### Fixed
+
+- Dry runs no longer touch Win32 APIs on non-Windows platforms.
+- `click(x, y, move=False)` now jumps to the coordinates instead of clicking
+  wherever the cursor already is.
+- `SequenceTask(assets_dir=...)` is honoured for relative templates.
+- Plan parsing raises `ConfigError` (not `ValueError`) for bad numbers, and
+  accepts numeric strings.
+- Invalid `press` keys and abort keys are rejected when the plan/config loads.
+- `osprey run` task modules can import sibling helper modules.
+- The visual editor closes its capture grabber after taking a template.
+
 ## [0.1.0] - 2026-10-28
 
 ### Added

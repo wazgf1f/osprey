@@ -48,6 +48,14 @@ class TestSafety(unittest.TestCase):
         with self.assertRaises(ValueError):
             Safety(max_runtime=0)
 
+    def test_invalid_abort_key_is_rejected_early(self) -> None:
+        with self.assertRaises(ValueError):
+            Safety(abort_keys=("not-a-real-key",))
+
+    def test_valid_abort_keys_are_kept(self) -> None:
+        safety = Safety(abort_keys=("f12", "ctrl"))
+        self.assertEqual(safety.abort_keys, ("f12", "ctrl"))
+
 
 if __name__ == "__main__":
     unittest.main()
