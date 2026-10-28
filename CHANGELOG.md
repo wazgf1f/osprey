@@ -21,6 +21,7 @@ Keep a Changelog, and the project uses semantic versioning.
   so saving no longer fails inside `json.dump`.
 - `Plan.validate` reports `ConfigError` for a non-list `steps` value or a
   non-`Step` entry instead of raising `AttributeError`.
+- Editing a step in the visual editor no longer drops its per-step `scales`.
 
 ### Fixed
 

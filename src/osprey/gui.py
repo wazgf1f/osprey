@@ -112,6 +112,7 @@ class StepDialog(tk.Toplevel):
         self.transient(master)
         self.value: Optional[Step] = None
 
+        self._scales = list(step.scales) if step.scales is not None else None
         self.action = tk.StringVar(value=step.action)
         self.template = tk.StringVar(value=step.template)
         self.key = tk.StringVar(value=step.key)
@@ -209,6 +210,7 @@ class StepDialog(tk.Toplevel):
                 wait=_as_float(self.wait, "动作后等待"),
                 threshold=_as_float(self.threshold, "阈值") if self.threshold.get().strip() else None,
                 timeout=_as_float(self.timeout, "超时") if self.timeout.get().strip() else None,
+                scales=self._scales if action in ("click", "move") else None,
                 on_missing={"找不到就停止": "stop", "找不到就跳过": "skip"}.get(self.missing.get()),
             )
             step.validate(0)

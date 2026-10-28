@@ -182,6 +182,26 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
+    def test_step_dialog_keeps_scales(self) -> None:
+        import tkinter as tk
+
+        from osprey.gui import PlanEditor, StepDialog
+
+        try:
+            editor = PlanEditor()
+        except tk.TclError as exc:  # pragma: no cover - headless session
+            self.skipTest("no display available: %s" % exc)
+
+        try:
+            step = Step("click", template="a.png", scales=[1.0, 1.25])
+            dialog = StepDialog(editor.root, step)
+            dialog._ok()
+            self.assertIsNotNone(dialog.value)
+            self.assertEqual(dialog.value.scales, [1.0, 1.25])
+        finally:
+            logging.getLogger("osprey").removeHandler(editor._log_handler)
+            editor.root.destroy()
+
     def test_stop_before_ready_is_remembered(self) -> None:
         import tkinter as tk
 
