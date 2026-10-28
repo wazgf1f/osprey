@@ -73,6 +73,26 @@ class TestDryRunInput(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.controller._sleep(value)
 
+    def test_hold_rejects_nan_before_pressing(self) -> None:
+        with self.assertRaises(ValueError):
+            self.controller.hold("a", float("nan"))
+        self.assertNotIn("key_down a", self.controller.history)
+
+    def test_press_rejects_nan_interval_before_pressing(self) -> None:
+        with self.assertRaises(ValueError):
+            self.controller.press("a", interval=float("nan"))
+        self.assertNotIn("key_down a", self.controller.history)
+
+    def test_write_rejects_nan_interval(self) -> None:
+        with self.assertRaises(ValueError):
+            self.controller.write("ok", interval=float("nan"))
+        self.assertEqual(self.controller.history, [])
+
+    def test_move_rejects_nan_duration(self) -> None:
+        with self.assertRaises(ValueError):
+            self.controller.move_to(10, 10, duration=float("nan"))
+        self.assertEqual(self.controller.history, [])
+
     def test_non_finite_speed_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
             InputController(speed=float("nan"))

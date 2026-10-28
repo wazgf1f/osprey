@@ -40,6 +40,10 @@ Keep a Changelog, and the project uses semantic versioning.
 - Unreadable plan paths are reported as `ConfigError` instead of `OSError`.
 - `wait_for` rejects non-positive intervals and negative timeouts.
 - Config and input reject NaN/infinity instead of spinning forever.
+- `wait_for` and `Context.sleep` reject non-finite timeouts and durations.
+- `hold`, `press`, `write` and `move_to` validate their timing parameters
+  before sending any input event.
+- The editor sizes itself to the available screen instead of assuming 1320x880.
 
 ## [0.1.0] - 2026-10-28
 

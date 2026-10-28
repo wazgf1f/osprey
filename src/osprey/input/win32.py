@@ -355,6 +355,10 @@ class InputController:
         humanize: bool = True,
     ) -> None:
         """Glide the cursor to (x, y) along a slightly curved path."""
+        if duration is not None:
+            duration = float(duration)
+            if not math.isfinite(duration) or duration < 0:
+                raise ValueError("duration must be a finite, non-negative number")
         x, y = int(round(x)), int(round(y))
         if not humanize:
             ax, ay = _absolute_xy(x, y)
@@ -436,6 +440,8 @@ class InputController:
             raise ValueError("button must be one of %s" % (sorted(self._BUTTONS),))
         if clicks < 1:
             raise ValueError("clicks must be at least 1")
+        if not math.isfinite(interval) or interval < 0:
+            raise ValueError("interval must be a finite, non-negative number")
         if x is not None and y is not None:
             self.move_to(x, y, humanize=move)
 
@@ -472,6 +478,8 @@ class InputController:
     def press(self, key, *, presses: int = 1, interval: float = 0.05) -> None:
         if presses < 1:
             raise ValueError("presses must be at least 1")
+        if not math.isfinite(interval) or interval < 0:
+            raise ValueError("interval must be a finite, non-negative number")
         for index in range(presses):
             self.key_down(key)
             self._sleep(self._rng.uniform(0.03, 0.08))
@@ -480,14 +488,17 @@ class InputController:
                 self._sleep(interval)
 
     def hold(self, key, seconds: float) -> None:
-        if seconds < 0:
-            raise ValueError("seconds must not be negative")
+        seconds = float(seconds)
+        if not math.isfinite(seconds) or seconds < 0:
+            raise ValueError("seconds must be a finite, non-negative number")
         self.key_down(key)
         self._sleep(seconds)
         self.key_up(key)
 
     def write(self, text: str, *, interval: float = 0.012) -> None:
         """Type arbitrary Unicode text using WM_CHAR-style unicode events."""
+        if not math.isfinite(interval) or interval < 0:
+            raise ValueError("interval must be a finite, non-negative number")
         for character in text:
             encoded = character.encode("utf-16-le")
             for offset in range(0, len(encoded), 2):

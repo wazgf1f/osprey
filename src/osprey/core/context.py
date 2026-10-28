@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 import time
 from dataclasses import dataclass, field
@@ -102,10 +103,12 @@ class Context:
     def wait_for(self, template: Union[str, np.ndarray], *, timeout: float = 10.0,
                  interval: float = 0.15, grab: bool = True, **kwargs) -> Optional[Detection]:
         """Poll the screen until template appears or timeout expires."""
-        if interval <= 0:
-            raise ValueError("interval must be positive")
-        if timeout < 0:
-            raise ValueError("timeout must not be negative")
+        timeout = float(timeout)
+        interval = float(interval)
+        if not math.isfinite(timeout) or timeout < 0:
+            raise ValueError("timeout must be a finite, non-negative number")
+        if not math.isfinite(interval) or interval <= 0:
+            raise ValueError("interval must be a positive, finite number")
         deadline = time.monotonic() + timeout
         while True:
             found = self.locate(template, **kwargs)
@@ -145,7 +148,10 @@ class Context:
 
     def sleep(self, seconds: float) -> None:
         """Abortable sleep; the panic key is checked every 20 ms."""
-        end = time.monotonic() + max(0.0, float(seconds))
+        seconds = float(seconds)
+        if not math.isfinite(seconds):
+            raise ValueError("sleep duration must be finite")
+        end = time.monotonic() + max(0.0, seconds)
         while True:
             self.safety.check()
             remaining = end - time.monotonic()

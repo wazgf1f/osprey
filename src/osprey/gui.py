@@ -219,8 +219,16 @@ class PlanEditor:
         enable_dpi_awareness()
         self.root = tk.Tk()
         self.root.title("Osprey 计划编辑器")
-        self.root.geometry("1320x880")
-        self.root.minsize(1080, 760)
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        width = min(1320, max(960, screen_w - 80))
+        height = min(880, max(640, screen_h - 120))
+        self.root.geometry("%dx%d+%d+%d" % (
+            width, height,
+            max(0, (screen_w - width) // 2),
+            max(0, (screen_h - height) // 3),
+        ))
+        self.root.minsize(min(1080, width), min(760, height))
         self.root.configure(bg=PALETTE["bg"])
         self._apply_theme()
 

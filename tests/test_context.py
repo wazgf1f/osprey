@@ -97,6 +97,21 @@ class TestLocate(unittest.TestCase):
         with self.assertRaises(Aborted):
             self.ctx.sleep(1.0)
 
+    def test_wait_for_rejects_non_finite_values(self) -> None:
+        for kwargs in (
+            {"timeout": float("nan")},
+            {"timeout": float("inf")},
+            {"interval": float("nan")},
+            {"interval": float("inf")},
+        ):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(ValueError):
+                    self.ctx.wait_for(self.template, **kwargs)
+
+    def test_sleep_rejects_non_finite_duration(self) -> None:
+        with self.assertRaises(ValueError):
+            self.ctx.sleep(float("nan"))
+
     def test_wait_for_rejects_non_positive_interval(self) -> None:
         with self.assertRaises(ValueError):
             self.ctx.wait_for(self.template, timeout=0.1, interval=0)
