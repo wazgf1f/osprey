@@ -141,6 +141,19 @@ class TestPlan(unittest.TestCase):
         with self.assertRaises(ConfigError):
             Plan.from_dict({"steps": [{"action": "wait", "seconds": float("nan")}]})
 
+    def test_load_accepts_utf8_bom(self) -> None:
+        with temp_dir() as folder:
+            path = os.path.join(folder, "plan.json")
+            with open(path, "w", encoding="utf-8-sig") as handle:
+                handle.write('{"steps": [{"action": "wait", "seconds": 1}]}')
+            plan = Plan.load(path)
+            self.assertEqual(len(plan.steps), 1)
+
+    def test_load_directory_raises_config_error(self) -> None:
+        with temp_dir() as folder:
+            with self.assertRaises(ConfigError):
+                Plan.load(folder)
+
     def test_save_elsewhere_pins_relative_templates(self) -> None:
         with temp_dir() as source, temp_dir() as target:
             plan = Plan(base_dir=source, steps=[Step("click", template="assets/a.png")])

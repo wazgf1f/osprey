@@ -67,6 +67,16 @@ class TestDryRunInput(unittest.TestCase):
         typed = [entry for entry in self.controller.history if entry.startswith("type ")]
         self.assertEqual(len(typed), 3)  # 'a' plus two UTF-16 units
 
+    def test_non_finite_sleep_is_rejected(self) -> None:
+        for value in (float("nan"), float("inf")):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    self.controller._sleep(value)
+
+    def test_non_finite_speed_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            InputController(speed=float("nan"))
+
     def test_move_produces_a_path(self) -> None:
         self.controller.move_to(300, 240, duration=0.01)
         moves = [entry for entry in self.controller.history if entry.startswith("move ")]

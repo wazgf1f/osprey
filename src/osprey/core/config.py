@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import math
 import os
 from typing import Any, Dict, Mapping, Optional
 
@@ -48,13 +49,15 @@ def validate_config(data: Mapping[str, Any]) -> Dict[str, Any]:
 
     if "threshold" in config:
         value = config["threshold"]
-        if not isinstance(value, (int, float)) or isinstance(value, bool) or not 0.0 <= float(value) <= 1.0:
+        if (not isinstance(value, (int, float)) or isinstance(value, bool)
+                or not math.isfinite(float(value)) or not 0.0 <= float(value) <= 1.0):
             raise ConfigError("threshold must be a number within [0, 1], got %r" % (value,))
         config["threshold"] = float(value)
 
     if "nms_iou" in config:
         value = config["nms_iou"]
-        if not isinstance(value, (int, float)) or isinstance(value, bool) or not 0.0 <= float(value) <= 1.0:
+        if (not isinstance(value, (int, float)) or isinstance(value, bool)
+                or not math.isfinite(float(value)) or not 0.0 <= float(value) <= 1.0):
             raise ConfigError("nms_iou must be a number within [0, 1], got %r" % (value,))
         config["nms_iou"] = float(value)
 
@@ -64,20 +67,23 @@ def validate_config(data: Mapping[str, Any]) -> Dict[str, Any]:
             raise ConfigError("scales must be a non-empty list of positive numbers")
         cleaned = []
         for scale in values:
-            if not isinstance(scale, (int, float)) or isinstance(scale, bool) or float(scale) <= 0:
+            if (not isinstance(scale, (int, float)) or isinstance(scale, bool)
+                    or not math.isfinite(float(scale)) or float(scale) <= 0):
                 raise ConfigError("scales must contain positive numbers, got %r" % (scale,))
             cleaned.append(float(scale))
         config["scales"] = cleaned
 
     if "fps" in config:
         value = config["fps"]
-        if not isinstance(value, (int, float)) or isinstance(value, bool) or float(value) <= 0:
+        if (not isinstance(value, (int, float)) or isinstance(value, bool)
+                or not math.isfinite(float(value)) or float(value) <= 0):
             raise ConfigError("fps must be a positive number, got %r" % (value,))
         config["fps"] = float(value)
 
     if "speed" in config:
         value = config["speed"]
-        if not isinstance(value, (int, float)) or isinstance(value, bool) or float(value) <= 0:
+        if (not isinstance(value, (int, float)) or isinstance(value, bool)
+                or not math.isfinite(float(value)) or float(value) <= 0):
             raise ConfigError("speed must be a positive number, got %r" % (value,))
         config["speed"] = float(value)
 
@@ -94,7 +100,8 @@ def validate_config(data: Mapping[str, Any]) -> Dict[str, Any]:
 
     if config.get("max_runtime") is not None:
         value = config["max_runtime"]
-        if not isinstance(value, (int, float)) or isinstance(value, bool) or float(value) <= 0:
+        if (not isinstance(value, (int, float)) or isinstance(value, bool)
+                or not math.isfinite(float(value)) or float(value) <= 0):
             raise ConfigError("max_runtime must be a positive number of seconds or null")
         config["max_runtime"] = float(value)
 
@@ -120,11 +127,12 @@ def load_config(path: Optional[str] = None, overrides: Optional[Mapping[str, Any
         if not os.path.exists(path):
             raise ConfigError("config file not found: %s" % path)
         try:
-            with open(path, "r", encoding="utf-8") as handle:
+            # utf-8-sig tolerates the BOM Notepad writes.
+            with open(path, "r", encoding="utf-8-sig") as handle:
                 loaded = json.load(handle)
         except json.JSONDecodeError as exc:
             raise ConfigError("invalid JSON in %s: %s" % (path, exc)) from exc
-        except OSError as exc:
+        except (OSError, UnicodeDecodeError) as exc:
             raise ConfigError("could not read %s: %s" % (path, exc)) from exc
         if not isinstance(loaded, dict):
             raise ConfigError("config file must contain a JSON object")

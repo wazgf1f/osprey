@@ -249,10 +249,13 @@ class Plan:
         if not os.path.exists(path):
             raise ConfigError("plan file not found: %s" % path)
         try:
-            with open(path, "r", encoding="utf-8") as handle:
+            # utf-8-sig tolerates the BOM Notepad writes.
+            with open(path, "r", encoding="utf-8-sig") as handle:
                 data = json.load(handle)
         except json.JSONDecodeError as exc:
             raise ConfigError("invalid JSON in %s: %s" % (path, exc)) from exc
+        except (OSError, UnicodeDecodeError) as exc:
+            raise ConfigError("could not read %s: %s" % (path, exc)) from exc
         return cls.from_dict(data, base_dir=os.path.dirname(os.path.abspath(path)))
 
     def save(self, path: str) -> None:

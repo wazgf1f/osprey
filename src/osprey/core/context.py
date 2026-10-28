@@ -102,6 +102,10 @@ class Context:
     def wait_for(self, template: Union[str, np.ndarray], *, timeout: float = 10.0,
                  interval: float = 0.15, grab: bool = True, **kwargs) -> Optional[Detection]:
         """Poll the screen until template appears or timeout expires."""
+        if interval <= 0:
+            raise ValueError("interval must be positive")
+        if timeout < 0:
+            raise ValueError("timeout must not be negative")
         deadline = time.monotonic() + timeout
         while True:
             found = self.locate(template, **kwargs)

@@ -297,8 +297,8 @@ class InputController:
         seed: Optional[int] = None,
         move_mode: str = "absolute",
     ) -> None:
-        if speed <= 0:
-            raise ValueError("speed must be positive")
+        if not math.isfinite(speed) or speed <= 0:
+            raise ValueError("speed must be a positive finite number")
         if move_mode not in ("absolute", "relative"):
             raise ValueError("move_mode must be 'absolute' or 'relative'")
         if _IS_WINDOWS:
@@ -328,6 +328,8 @@ class InputController:
 
     def _sleep(self, seconds: float) -> None:
         """Sleep in slices so a panic key can interrupt holds, typing and moves."""
+        if not math.isfinite(seconds):
+            raise ValueError("sleep duration must be finite")
         if seconds <= 0:
             return
         end = time.monotonic() + seconds

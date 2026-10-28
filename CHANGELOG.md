@@ -31,6 +31,10 @@ Keep a Changelog, and the project uses semantic versioning.
 - Plan numbers must be finite; NaN/infinity raise `ConfigError`.
 - Saving a plan into another directory pins its relative templates to absolute
   paths instead of silently breaking them.
+- Plan and config JSON files with a UTF-8 BOM (Notepad default) now load.
+- Unreadable plan paths are reported as `ConfigError` instead of `OSError`.
+- `wait_for` rejects non-positive intervals and negative timeouts.
+- Config and input reject NaN/infinity instead of spinning forever.
 
 ## [0.1.0] - 2026-10-28
 

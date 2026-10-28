@@ -97,6 +97,14 @@ class TestLocate(unittest.TestCase):
         with self.assertRaises(Aborted):
             self.ctx.sleep(1.0)
 
+    def test_wait_for_rejects_non_positive_interval(self) -> None:
+        with self.assertRaises(ValueError):
+            self.ctx.wait_for(self.template, timeout=0.1, interval=0)
+
+    def test_wait_for_rejects_negative_timeout(self) -> None:
+        with self.assertRaises(ValueError):
+            self.ctx.wait_for(self.template, timeout=-1)
+
     def test_wait_for_times_out(self) -> None:
         self.assertIsNone(self.ctx.wait_for(sample_template(seed=42), timeout=0.05, interval=0.01))
 

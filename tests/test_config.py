@@ -39,6 +39,14 @@ class TestConfig(unittest.TestCase):
         with self.assertRaises(ConfigError):
             load_config("does-not-exist.json")
 
+    def test_bom_json_is_accepted(self) -> None:
+        with temp_dir() as folder:
+            path = os.path.join(folder, "config.json")
+            with open(path, "w", encoding="utf-8-sig") as handle:
+                json.dump({"threshold": 0.5}, handle)
+            config = load_config(path)
+            self.assertEqual(config["threshold"], 0.5)
+
     def test_bad_json_raises(self) -> None:
         with temp_dir() as folder:
             path = os.path.join(folder, "bad.json")
@@ -56,7 +64,10 @@ class TestConfig(unittest.TestCase):
             {"scales": "1.0"},
             {"scales": [1.0, -0.5]},
             {"fps": 0},
+            {"fps": float("nan")},
             {"speed": 0},
+            {"scales": [float("inf")]},
+            {"threshold": float("nan")},
             {"dry_run": "yes"},
             {"abort_keys": [1, 2]},
             {"max_runtime": -1},
