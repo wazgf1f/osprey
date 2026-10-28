@@ -66,9 +66,10 @@ class TestGuiSmoke(unittest.TestCase):
             self.skipTest("no display available: %s" % exc)
 
         try:
-            with mock.patch("osprey.gui.GdiGrabber", side_effect=RuntimeError("no gdi")):
+            with mock.patch("osprey.gui.GdiGrabber", side_effect=RuntimeError("no gdi")) as grabber_cls:
                 with mock.patch("osprey.gui.messagebox.showerror") as show:
                     result = editor._capture_template()
+            self.assertTrue(grabber_cls.call_args.kwargs.get("full_desktop"))
             self.assertIsNone(result)
             self.assertTrue(show.called)
             self.assertNotEqual(editor.root.state(), "withdrawn")

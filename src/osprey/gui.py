@@ -623,7 +623,8 @@ class PlanEditor:
         time.sleep(0.2)
         grabber = None
         try:
-            grabber = GdiGrabber()
+            # Capture every monitor so templates on a secondary screen work.
+            grabber = GdiGrabber(full_desktop=True)
             frame = grabber.grab()
         except Exception as exc:
             self.root.deiconify()
@@ -635,7 +636,7 @@ class PlanEditor:
 
         overlay = tk.Toplevel(self.root)
         overlay.overrideredirect(True)
-        overlay.geometry("%dx%d+%d+%d" % (frame.width, frame.height,
+        overlay.geometry("%dx%d%+d%+d" % (frame.width, frame.height,
                                           frame.origin[0], frame.origin[1]))
         overlay.attributes("-topmost", True)
         overlay.attributes("-alpha", 0.30)
@@ -739,7 +740,8 @@ class PlanEditor:
             engine = Engine(
                 SequenceTask(plan),
                 config=EngineConfig(fps=plan.fps, dry_run=not live, abort_keys=("f12",)),
-                settings={"threshold": plan.threshold, "scales": plan.scales},
+                settings={"threshold": plan.threshold, "scales": plan.scales,
+                          "all_screens": True},
             )
             stats = engine.run(on_ready=self._on_ready)
             self._post(self._finished, stats)
