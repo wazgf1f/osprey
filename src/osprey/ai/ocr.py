@@ -266,7 +266,8 @@ def default_ocr_backend() -> str:
     try:
         _rapid_engine()
         return "rapidocr"
-    except OcrError:
+    except Exception:
+        # A broken RapidOCR install must not prevent the Windows fallback.
         pass
     try:
         import pytesseract  # noqa: F401

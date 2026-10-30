@@ -24,6 +24,8 @@ Keep a Changelog, and the project uses semantic versioning.
   the user profile languages.
 - Expected Osprey/AI errors such as a missing API key or OCR backend now log a
   single line and produce a clean CLI error instead of a traceback.
+- A broken RapidOCR installation now falls back to Windows OCR instead of
+  failing during task setup.
 
 ## [0.1.2] - 2026-10-28
 

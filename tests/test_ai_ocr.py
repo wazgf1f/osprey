@@ -9,9 +9,18 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from osprey.ai.ocr import ocr_frame
+from osprey.ai.ocr import default_ocr_backend, ocr_frame
 
 from .helpers import make_frame, sample_template
+
+
+class TestBackendSelection(unittest.TestCase):
+    def test_broken_rapidocr_falls_back_to_windows(self) -> None:
+        with mock.patch("osprey.ai.ocr._rapid_engine", side_effect=RuntimeError("broken")):
+            with mock.patch.dict(sys.modules, {"pytesseract": None}):
+                with mock.patch("osprey.ai.ocr.sys.platform", "win32"):
+                    with mock.patch("osprey.ai.ocr.shutil.which", return_value="powershell"):
+                        self.assertEqual(default_ocr_backend(), "windows")
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows OCR runs on Windows")
