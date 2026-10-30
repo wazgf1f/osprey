@@ -370,6 +370,7 @@ class PlanEditor:
         self._running = False
         self._stop_requested = False
         self._closing = False
+        self._hidden_for_run = False
         self._log_handler: Optional[_LogHandler] = None
 
         self._build()
@@ -901,13 +902,22 @@ class PlanEditor:
         )
 
     def _start_task(self, task, live: bool, settings: dict,
-                    fps: float, label: str) -> None:
+                    fps: float, label: str, *, hide_editor: bool = False) -> None:
         if self._running:
             return
         self._stop_requested = False
         self._running = True
         self._set_running_buttons()
         self._set_status(label, kind="run")
+        if hide_editor:
+            # OCR must see the whole desktop, not Osprey covering the target.
+            try:
+                self.root.iconify()
+                self.root.update_idletasks()
+                time.sleep(0.25)
+            except tk.TclError:
+                pass
+            self._hidden_for_run = True
         thread = threading.Thread(
             target=self._worker, args=(task, live, settings, fps), daemon=True)
         thread.start()
@@ -932,6 +942,7 @@ class PlanEditor:
              "ai_max_steps": result["max_steps"], "ai_tick_wait": 0.8},
             1.0,
             "AI 运行中…" if not result["live"] else "AI 真实运行中…",
+            hide_editor=True,
         )
 
     def _post(self, callback, *args) -> None:
@@ -967,7 +978,18 @@ class PlanEditor:
             self._safety.request_stop("stopped from the editor")
         self._set_status("正在停止…", kind="run")
 
+    def _restore_editor(self) -> None:
+        if not self._hidden_for_run:
+            return
+        self._hidden_for_run = False
+        try:
+            self.root.deiconify()
+            self.root.lift()
+        except tk.TclError:
+            pass
+
     def _finished(self, stats) -> None:
+        self._restore_editor()
         self._running = False
         self._stop_requested = False
         self._safety = None
@@ -977,6 +999,7 @@ class PlanEditor:
                          % (stats.ticks, stats.actions, stats.stop_reason or "结束"))
 
     def _failed(self, exc: Exception) -> None:
+        self._restore_editor()
         self._running = False
         self._stop_requested = False
         self._safety = None

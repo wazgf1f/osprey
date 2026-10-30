@@ -2,6 +2,7 @@
   "goal": "Open the Windows Settings app and click System",
   "fps": 1,
   "dry_run": true,
+  "all_screens": true,
   "ai_max_steps": 30,
   "ai_tick_wait": 0.8
 }

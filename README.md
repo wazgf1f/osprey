@@ -182,7 +182,9 @@ box for the goal, an optional DeepSeek API key and a step limit.
    dialog. The dialog key is used for that run only and is not saved.
 2. Click **AI 指令…**, type an instruction such as
    "open Windows Settings and click System".
-3. Use **试运行** first, then **真实运行**. **F12** or **停止** stops the agent.
+3. Use **试运行** first, then **真实运行**. The editor minimises itself so
+   OCR sees the whole desktop instead of the Osprey window. **F12** stops the
+   agent.
 4. OCR uses the Windows 10/11 built-in engine, so the installed app needs no
    extra Python packages. Install <code>.[ai]</code> for an optional RapidOCR
    backend.

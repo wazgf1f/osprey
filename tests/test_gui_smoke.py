@@ -213,6 +213,27 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
+    def test_restore_editor_after_hidden_ai_run(self) -> None:
+        import tkinter as tk
+
+        from osprey.gui import PlanEditor
+
+        try:
+            editor = PlanEditor()
+        except tk.TclError as exc:  # pragma: no cover - headless session
+            self.skipTest("no display available: %s" % exc)
+
+        try:
+            editor._hidden_for_run = True
+            editor.root.iconify()
+            editor.root.update()
+            editor._restore_editor()
+            self.assertFalse(editor._hidden_for_run)
+            self.assertEqual(editor.root.state(), "normal")
+        finally:
+            logging.getLogger("osprey").removeHandler(editor._log_handler)
+            editor.root.destroy()
+
     def test_ai_dialog_returns_instruction(self) -> None:
         import tkinter as tk
 

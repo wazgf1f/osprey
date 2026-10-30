@@ -28,6 +28,8 @@ Keep a Changelog, and the project uses semantic versioning.
   failing during task setup.
 - DeepSeek requests retry without JSON mode when the selected model rejects
   `response_format`, and API keys are trimmed before use.
+- AI runs minimise the editor so OCR captures the whole desktop instead of the
+  Osprey window itself.
 
 ## [0.1.2] - 2026-10-28
 
