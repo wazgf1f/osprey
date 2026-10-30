@@ -44,7 +44,7 @@ class TestWindowsOcr(unittest.TestCase):
             with mock.patch("osprey.ai.ocr.subprocess.run", side_effect=fake_run) as run:
                 items = ocr_frame(frame, backend="windows")
         self.assertEqual(len(items), 1)
-        self.assertEqual(items[0].text, "确定 取消")
+        self.assertEqual(items[0].text, "确定取消")
         self.assertEqual(items[0].box, (10, 20, 90, 20))
         self.assertIn("-Out", run.call_args.args[0])
 

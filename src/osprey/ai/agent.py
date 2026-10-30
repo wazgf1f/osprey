@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import math
 from typing import Any, Callable, Dict, List, Optional
@@ -20,6 +21,8 @@ Choose exactly one action and reply with JSON only:
 Rules:
 - click only an element_id present in the list.
 - Prefer text that exactly matches the goal; use position when texts repeat.
+- The goal is semantic. "next page" may appear as 下一页, 下一节, Next, >, or a
+  similar next-navigation control; choose that control when it fits the goal.
 - Use wait when the screen is still loading.
 - Use done when the goal is already satisfied or cannot be reached.
 """
@@ -49,7 +52,8 @@ class OcrAgentTask(Task):
         if self._ocr is None:
             default_ocr_backend()
         self.client = self._client or DeepSeekClient(api_key=self._api_key)
-        self.ocr = self._ocr or ocr_frame
+        self.ocr = self._ocr or functools.partial(
+            ocr_frame, detail=True, max_items=250)
         self.steps = 0
         self.history = []
 

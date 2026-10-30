@@ -30,6 +30,9 @@ Keep a Changelog, and the project uses semantic versioning.
   `response_format`, and API keys are trimmed before use.
 - AI runs minimise the editor so OCR captures the whole desktop instead of the
   Osprey window itself.
+- AI OCR rescans the lower half of the screen at 4x and removes spaces Windows
+  OCR inserts between Chinese characters, so small buttons such as 下一节 are
+  visible. The prompt also accepts 下一节/Next as a "next page" control.
 
 ## [0.1.2] - 2026-10-28
 

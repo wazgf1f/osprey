@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -16,6 +17,24 @@ import numpy as np
 
 from ..capture.base import Frame
 from ..errors import OspreyError
+
+
+_CJK = r"\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff"
+_CJK_SPACE = re.compile(r"(?<=[%s])\s+(?=[%s])" % (_CJK, _CJK))
+_CJK_PUNCT = "，。！？；：、（）【】《》〈〉「」『』…—"
+
+
+def normalize_text(text: str) -> str:
+    """Collapse whitespace and remove spaces Windows OCR inserts between CJK characters."""
+    text = " ".join(str(text or "").split())
+    for _ in range(3):
+        updated = _CJK_SPACE.sub("", text)
+        for mark in _CJK_PUNCT:
+            updated = updated.replace(mark + " ", mark).replace(" " + mark, mark)
+        if updated == text:
+            break
+        text = updated
+    return text
 
 
 class OcrError(OspreyError):
@@ -59,20 +78,9 @@ $file = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($Path)) ([Win
 $stream = Await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
 $decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
 $bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
-$engine = $null
 [Windows.Globalization.Language,Windows.Globalization,ContentType=WindowsRuntime] | Out-Null
-foreach ($tag in @('zh-Hans-CN', 'zh-Hans', 'en-US', 'en-GB')) {
-    try {
-        $language = New-Object Windows.Globalization.Language $tag
-        $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($language)
-    } catch {
-        $engine = $null
-    }
-    if ($null -ne $engine) { break }
-}
-if ($null -eq $engine) {
-    $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
-}
+$lang = New-Object Windows.Globalization.Language -ArgumentList "zh-Hans-CN"
+$engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($lang)
 if ($null -eq $engine) {
     [System.IO.File]::WriteAllText($Out, '[]', (New-Object System.Text.UTF8Encoding($false)))
     exit 1
@@ -195,8 +203,8 @@ def _windows_script() -> Path:
     return _SCRIPT_PATH
 
 
-def _windows_items(frame: Frame) -> List[OcrItem]:
-    """Windows 10/11 built-in OCR through PowerShell + WinRT."""
+def _run_windows_ocr(image, *, offset=(0, 0), scale: float = 1.0) -> List[OcrItem]:
+    """OCR one PIL image and translate its boxes back to frame coordinates."""
     if sys.platform != "win32":
         raise OcrError("Windows OCR is only available on Windows")
     powershell = shutil.which("powershell") or str(
@@ -211,9 +219,7 @@ def _windows_items(frame: Frame) -> List[OcrItem]:
     fd, json_path = tempfile.mkstemp(prefix="osprey_ocr_", suffix=".json")
     os.close(fd)
     try:
-        from PIL import Image
-        rgb = np.ascontiguousarray(frame.bgr[..., ::-1])
-        Image.fromarray(rgb).save(image_path, format="PNG")
+        image.convert("RGB").save(image_path, format="PNG")
         flags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
         result = subprocess.run(
             [powershell, "-STA", "-NoProfile", "-NonInteractive",
@@ -253,12 +259,72 @@ def _windows_items(frame: Frame) -> List[OcrItem]:
         top = min(int(word["y"]) for word in words)
         right = max(int(word["x"]) + int(word["w"]) for word in words)
         bottom = max(int(word["y"]) + int(word["h"]) for word in words)
-        text = " ".join(str(line.get("text") or "").split())
+        text = normalize_text(line.get("text") or "")
         if not text:
-            text = " ".join(str(word.get("text") or "") for word in words).strip()
-        if text and right > left and bottom > top:
-            items.append(OcrItem(text=text, box=(left, top, right - left, bottom - top)))
+            text = normalize_text(" ".join(str(word.get("text") or "") for word in words))
+        if not text or right <= left or bottom <= top:
+            continue
+        box = (
+            int(round(left / scale)) + offset[0],
+            int(round(top / scale)) + offset[1],
+            max(1, int(round((right - left) / scale))),
+            max(1, int(round((bottom - top) / scale))),
+        )
+        items.append(OcrItem(text=text, box=box))
     return items
+
+
+def _dedupe(items: List[OcrItem]) -> List[OcrItem]:
+    kept: List[OcrItem] = []
+    for item in items:
+        duplicate = False
+        for other in kept:
+            if item.text != other.text:
+                continue
+            ax, ay, aw, ah = item.box
+            bx, by, bw, bh = other.box
+            left = max(ax, bx)
+            top = max(ay, by)
+            right = min(ax + aw, bx + bw)
+            bottom = min(ay + ah, by + bh)
+            if right > left and bottom > top:
+                overlap = (right - left) * (bottom - top)
+                union = aw * ah + bw * bh - overlap
+                if union > 0 and overlap / union > 0.5:
+                    duplicate = True
+                    break
+        if not duplicate:
+            kept.append(item)
+    return kept
+
+
+def _windows_items(frame: Frame, *, detail: bool = False) -> List[OcrItem]:
+    """Windows OCR; detail also scans the lower half at 4x for small buttons."""
+    from PIL import Image, ImageOps
+
+    rgb = np.ascontiguousarray(frame.bgr[..., ::-1])
+    base = Image.fromarray(rgb)
+    items = _run_windows_ocr(base)
+    if not detail:
+        return items
+
+    gray = ImageOps.grayscale(base)
+    top = int(base.height * 0.5)
+    tile_size = 400
+    step = 350
+    for y in range(top, base.height, tile_size):
+        for x in range(0, base.width, step):
+            right = min(x + tile_size, base.width)
+            bottom = min(y + tile_size, base.height)
+            if right - x < 20 or bottom - y < 20:
+                continue
+            tile = ImageOps.autocontrast(gray.crop((x, y, right, bottom)))
+            big = tile.resize((tile.width * 4, tile.height * 4), Image.LANCZOS)
+            try:
+                items.extend(_run_windows_ocr(big, offset=(x, y), scale=4.0))
+            except OcrError:
+                continue
+    return _dedupe(items)
 
 
 def default_ocr_backend() -> str:
@@ -283,7 +349,8 @@ def default_ocr_backend() -> str:
 
 
 def ocr_frame(frame: Frame, *, backend: str = "auto",
-              min_confidence: float = 0.4, max_items: int = 80) -> List[OcrItem]:
+              min_confidence: float = 0.4, max_items: int = 80,
+              detail: bool = False) -> List[OcrItem]:
     """OCR the frame and return text boxes sorted top-to-bottom, left-to-right."""
     if max_items <= 0:
         return []
@@ -300,7 +367,7 @@ def ocr_frame(frame: Frame, *, backend: str = "auto",
             elif name == "pytesseract":
                 items = _tesseract_items(frame)
             else:
-                items = _windows_items(frame)
+                items = _windows_items(frame, detail=detail)
         except Exception as exc:
             errors.append("%s: %s" % (name, exc))
             continue
@@ -309,7 +376,8 @@ def ocr_frame(frame: Frame, *, backend: str = "auto",
         raise OcrError("OCR failed: " + "; ".join(errors))
 
     cleaned = [
-        OcrItem(text=item.text[:120], box=item.box, confidence=item.confidence)
+        OcrItem(text=normalize_text(item.text)[:120], box=item.box,
+                confidence=item.confidence)
         for item in items if item.confidence >= min_confidence
     ]
     cleaned.sort(key=lambda item: (item.box[1] // 10, item.box[0]))
