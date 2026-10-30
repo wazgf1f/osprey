@@ -43,7 +43,7 @@ def parse_json_reply(content: str) -> Dict[str, Any]:
 class DeepSeekClient:
     def __init__(self, api_key: Optional[str] = None, *, model: Optional[str] = None,
                  base_url: Optional[str] = None, timeout: float = 45.0) -> None:
-        self.api_key = api_key or os.environ.get("DEEPSEEK_API_KEY", "")
+        self.api_key = (api_key or os.environ.get("DEEPSEEK_API_KEY", "")).strip()
         if not self.api_key:
             raise DeepSeekError("DEEPSEEK_API_KEY is not set")
         self.model = model or os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
@@ -62,6 +62,16 @@ class DeepSeekClient:
             "max_tokens": 400,
             "response_format": {"type": "json_object"},
         }
+        try:
+            return self._post(body)
+        except DeepSeekError as exc:
+            # Some models (for example deepseek-reasoner) reject JSON mode.
+            if "response_format" in str(exc):
+                body.pop("response_format", None)
+                return self._post(body)
+            raise
+
+    def _post(self, body: Dict[str, Any]) -> Dict[str, Any]:
         request = urllib.request.Request(
             self.base_url + "/chat/completions",
             data=json.dumps(body).encode("utf-8"),

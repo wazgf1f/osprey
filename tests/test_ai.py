@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import unittest
+from unittest import mock
 
 from osprey.ai.agent import OcrAgentTask
-from osprey.ai.deepseek import DeepSeekError, parse_json_reply
+from osprey.ai.deepseek import DeepSeekClient, DeepSeekError, parse_json_reply
 from osprey.ai.ocr import OcrError, OcrItem
 from osprey.errors import OspreyError
 from osprey.core.context import Context
@@ -41,6 +42,31 @@ class TestErrors(unittest.TestCase):
     def test_ai_errors_are_osprey_errors(self) -> None:
         self.assertTrue(issubclass(DeepSeekError, OspreyError))
         self.assertTrue(issubclass(OcrError, OspreyError))
+
+
+class TestDeepSeekClient(unittest.TestCase):
+    def test_falls_back_without_json_mode(self) -> None:
+        client = DeepSeekClient(api_key="sk-test")
+        calls = []
+
+        def fake_post(body):
+            calls.append(dict(body))
+            if len(calls) == 1:
+                raise DeepSeekError("DeepSeek HTTP 400: response_format unsupported")
+            return {"action": "done"}
+
+        with mock.patch.object(client, "_post", side_effect=fake_post):
+            reply = client.complete_json("system", "user")
+        self.assertEqual(reply["action"], "done")
+        self.assertIn("response_format", calls[0])
+        self.assertNotIn("response_format", calls[1])
+
+    def test_other_api_errors_are_not_retried(self) -> None:
+        client = DeepSeekClient(api_key="sk-test")
+        with mock.patch.object(client, "_post",
+                               side_effect=DeepSeekError("DeepSeek HTTP 401: bad key")):
+            with self.assertRaises(DeepSeekError):
+                client.complete_json("system", "user")
 
 
 class TestParseReply(unittest.TestCase):

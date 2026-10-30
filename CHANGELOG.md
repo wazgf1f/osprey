@@ -26,6 +26,8 @@ Keep a Changelog, and the project uses semantic versioning.
   single line and produce a clean CLI error instead of a traceback.
 - A broken RapidOCR installation now falls back to Windows OCR instead of
   failing during task setup.
+- DeepSeek requests retry without JSON mode when the selected model rejects
+  `response_format`, and API keys are trimmed before use.
 
 ## [0.1.2] - 2026-10-28
 
