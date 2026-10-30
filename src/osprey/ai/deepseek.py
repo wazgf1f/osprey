@@ -8,11 +8,13 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict, Optional
 
+from ..errors import OspreyError
+
 FENCE = chr(96) * 3
 
 
-class DeepSeekError(RuntimeError):
-    pass
+class DeepSeekError(OspreyError):
+    """The DeepSeek API is unavailable or returned an invalid reply."""
 
 
 def parse_json_reply(content: str) -> Dict[str, Any]:

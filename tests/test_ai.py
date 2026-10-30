@@ -6,8 +6,9 @@ import json
 import unittest
 
 from osprey.ai.agent import OcrAgentTask
-from osprey.ai.deepseek import parse_json_reply
-from osprey.ai.ocr import OcrItem
+from osprey.ai.deepseek import DeepSeekError, parse_json_reply
+from osprey.ai.ocr import OcrError, OcrItem
+from osprey.errors import OspreyError
 from osprey.core.context import Context
 from osprey.core.safety import Safety
 from osprey.input.win32 import InputController
@@ -34,6 +35,12 @@ def make_context(goal="click OK"):
         safety=Safety(abort_keys=()),
         config={"goal": goal, "ai_tick_wait": 0.0},
     )
+
+
+class TestErrors(unittest.TestCase):
+    def test_ai_errors_are_osprey_errors(self) -> None:
+        self.assertTrue(issubclass(DeepSeekError, OspreyError))
+        self.assertTrue(issubclass(OcrError, OspreyError))
 
 
 class TestParseReply(unittest.TestCase):

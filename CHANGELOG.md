@@ -22,6 +22,8 @@ Keep a Changelog, and the project uses semantic versioning.
 - AI actions accept case-insensitive action names and numeric-string element ids.
 - Windows OCR prefers an installed Chinese recognizer before falling back to
   the user profile languages.
+- Expected Osprey/AI errors such as a missing API key or OCR backend now log a
+  single line and produce a clean CLI error instead of a traceback.
 
 ## [0.1.2] - 2026-10-28
 

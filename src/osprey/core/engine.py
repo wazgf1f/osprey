@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Optional, Tuple
 
 from ..capture.base import FrameSource
-from ..errors import Aborted
+from ..errors import Aborted, OspreyError
 from ..input.win32 import InputController
 from .context import Context
 from .safety import Safety
@@ -186,6 +186,11 @@ class Engine:
         except KeyboardInterrupt:
             self.stats.finish("keyboard interrupt")
             logger.warning("interrupted by keyboard")
+        except OspreyError as exc:
+            self.stats.errors += 1
+            self.stats.finish("error: %s" % exc)
+            logger.error("task failed: %s", exc)
+            raise
         except Exception as exc:
             self.stats.errors += 1
             self.stats.finish("error: %s" % exc)

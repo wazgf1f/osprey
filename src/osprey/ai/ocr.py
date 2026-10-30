@@ -15,9 +15,10 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 
 from ..capture.base import Frame
+from ..errors import OspreyError
 
 
-class OcrError(RuntimeError):
+class OcrError(OspreyError):
     """OCR is unavailable or failed."""
 
 
