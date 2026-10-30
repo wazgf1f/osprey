@@ -33,6 +33,8 @@ Keep a Changelog, and the project uses semantic versioning.
 - AI OCR rescans the lower half of the screen at 4x and removes spaces Windows
   OCR inserts between Chinese characters, so small buttons such as 下一节 are
   visible. The prompt also accepts 下一节/Next as a "next page" control.
+- Installed builds no longer fail OCR with WinError 50; the hidden PowerShell
+  process uses STARTUPINFO instead of CREATE_NO_WINDOW.
 
 ## [0.1.2] - 2026-10-28
 

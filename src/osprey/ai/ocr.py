@@ -220,12 +220,16 @@ def _run_windows_ocr(image, *, offset=(0, 0), scale: float = 1.0) -> List[OcrIte
     os.close(fd)
     try:
         image.convert("RGB").save(image_path, format="PNG")
-        flags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
+        startupinfo = None
+        if sys.platform == "win32":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
         result = subprocess.run(
             [powershell, "-STA", "-NoProfile", "-NonInteractive",
              "-ExecutionPolicy", "Bypass", "-File", str(script),
              "-Path", image_path, "-Out", json_path],
-            capture_output=True, timeout=30, creationflags=flags,
+            capture_output=True, timeout=30, startupinfo=startupinfo,
         )
         output = Path(json_path).read_text(encoding="utf-8", errors="replace").strip()
         detail = (result.stderr or b"").decode("utf-8", "replace")[:500]
