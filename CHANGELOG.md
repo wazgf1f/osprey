@@ -15,6 +15,14 @@ Keep a Changelog, and the project uses semantic versioning.
   key field and dry/live runs.
 - `examples/ai_agent.py` and `examples/ai_agent.json`.
 
+### Fixed
+
+- Windows OCR writes its JSON to a UTF-8 file, so redirected console code pages
+  no longer corrupt non-ASCII text.
+- AI actions accept case-insensitive action names and numeric-string element ids.
+- Windows OCR prefers an installed Chinese recognizer before falling back to
+  the user profile languages.
+
 ## [0.1.2] - 2026-10-28
 
 ### Added

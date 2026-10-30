@@ -72,6 +72,20 @@ class TestOcrAgent(unittest.TestCase):
         task.step(ctx)
         self.assertTrue(ctx.safety.aborted)
 
+    def test_numeric_string_and_uppercase_action_are_accepted(self) -> None:
+        items = [OcrItem("OK", (10, 10, 20, 20))]
+        client = FakeClient([
+            {"action": "CLICK", "element_id": "0"},
+            {"action": "DONE"},
+        ])
+        task = OcrAgentTask(client=client, ocr=lambda _frame: items)
+        ctx = make_context()
+        task.setup(ctx)
+        task.step(ctx)
+        self.assertEqual(ctx.stats.actions, 1)
+        task.step(ctx)
+        self.assertTrue(ctx.safety.aborted)
+
     def test_invalid_element_id_does_not_click(self) -> None:
         items = [OcrItem("OK", (10, 10, 20, 20))]
         client = FakeClient([{"action": "click", "element_id": 9}])

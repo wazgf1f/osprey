@@ -101,8 +101,14 @@ class OcrAgentTask(Task):
 
     def _apply(self, ctx: Context, items: List[OcrItem], action: Dict[str, Any]) -> None:
         kind = action.get("action")
+        if isinstance(kind, str):
+            kind = kind.strip().lower()
         if kind == "click":
             element_id = action.get("element_id")
+            if isinstance(element_id, str) and element_id.strip().isdigit():
+                element_id = int(element_id.strip())
+            elif isinstance(element_id, float) and element_id.is_integer():
+                element_id = int(element_id)
             if isinstance(element_id, bool) or not isinstance(element_id, int):
                 ctx.logger.warning("AI returned an invalid element_id: %r", element_id)
                 ctx.sleep(self.tick_wait)

@@ -10,7 +10,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -34,9 +34,9 @@ class OcrItem:
 
 
 _RAPID = None
-_SCRIPT_PATH: Path | None = None
+_SCRIPT_PATH: Optional[Path] = None
 
-_WINDOWS_SCRIPT = r'''param([string]$Path)
+_WINDOWS_SCRIPT = r'''param([string]$Path, [string]$Out)
 Add-Type -AssemblyName System.Runtime.WindowsRuntime | Out-Null
 $asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
     $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and
@@ -58,8 +58,24 @@ $file = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($Path)) ([Win
 $stream = Await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
 $decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
 $bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
-$engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
-if ($null -eq $engine) { Write-Output '[]'; exit 1 }
+$engine = $null
+[Windows.Globalization.Language,Windows.Globalization,ContentType=WindowsRuntime] | Out-Null
+foreach ($tag in @('zh-Hans-CN', 'zh-Hans', 'en-US', 'en-GB')) {
+    try {
+        $language = New-Object Windows.Globalization.Language $tag
+        $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($language)
+    } catch {
+        $engine = $null
+    }
+    if ($null -ne $engine) { break }
+}
+if ($null -eq $engine) {
+    $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
+}
+if ($null -eq $engine) {
+    [System.IO.File]::WriteAllText($Out, '[]', (New-Object System.Text.UTF8Encoding($false)))
+    exit 1
+}
 $result = Await ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
 $lines = @()
 foreach ($line in $result.Lines) {
@@ -75,7 +91,8 @@ foreach ($line in $result.Lines) {
     }
     $lines += @{ text = $line.Text; words = $words }
 }
-ConvertTo-Json -InputObject @($lines) -Depth 6 -Compress
+$json = ConvertTo-Json -InputObject @($lines) -Depth 6 -Compress
+[System.IO.File]::WriteAllText($Out, $json, (New-Object System.Text.UTF8Encoding($false)))
 '''
 
 
@@ -190,6 +207,8 @@ def _windows_items(frame: Frame) -> List[OcrItem]:
     script = _windows_script()
     fd, image_path = tempfile.mkstemp(prefix="osprey_ocr_", suffix=".png")
     os.close(fd)
+    fd, json_path = tempfile.mkstemp(prefix="osprey_ocr_", suffix=".json")
+    os.close(fd)
     try:
         from PIL import Image
         rgb = np.ascontiguousarray(frame.bgr[..., ::-1])
@@ -198,18 +217,19 @@ def _windows_items(frame: Frame) -> List[OcrItem]:
         result = subprocess.run(
             [powershell, "-STA", "-NoProfile", "-NonInteractive",
              "-ExecutionPolicy", "Bypass", "-File", str(script),
-             "-Path", image_path],
-            capture_output=True, text=True, timeout=30, creationflags=flags,
+             "-Path", image_path, "-Out", json_path],
+            capture_output=True, timeout=30, creationflags=flags,
         )
+        output = Path(json_path).read_text(encoding="utf-8", errors="replace").strip()
+        detail = (result.stderr or b"").decode("utf-8", "replace")[:500]
     finally:
-        try:
-            os.unlink(image_path)
-        except OSError:
-            pass
+        for path in (image_path, json_path):
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
 
-    output = (result.stdout or "").strip()
     if not output:
-        detail = (result.stderr or "").strip()[:500]
         raise OcrError("Windows OCR returned nothing: %s" % detail)
     start = min([index for index in (output.find("["), output.find("{")) if index >= 0] or [0])
     try:
