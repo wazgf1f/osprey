@@ -156,13 +156,15 @@ class OcrAgentTask(Task):
         if kind == "scroll":
             try:
                 amount = int(round(float(action.get("amount", -3))))
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 amount = -3
             amount = max(-10, min(10, amount))
             if amount == 0:
                 amount = -3
-            center = (ctx.frame.width / 2.0, ctx.frame.height / 2.0)
-            ctx.scroll(amount, center)
+            xs = sorted(item.center[0] for item in items)
+            ys = sorted(item.center[1] for item in items)
+            target = (xs[len(xs) // 2], ys[len(ys) // 2])
+            ctx.scroll(amount, target)
             self.history.append("scroll %d" % amount)
             ctx.sleep(self.tick_wait)
             return

@@ -134,6 +134,15 @@ class TestOcrAgent(unittest.TestCase):
         with self.assertRaises(Exception):
             task.setup(make_context(goal=""))
 
+    def test_scroll_infinite_amount_uses_default(self) -> None:
+        task = OcrAgentTask(
+            client=FakeClient([{"action": "scroll", "amount": float("inf")}]),
+            ocr=lambda _frame: [OcrItem("OK", (10, 10, 20, 20))])
+        ctx = make_context()
+        task.setup(ctx)
+        task.step(ctx)
+        self.assertTrue(any(entry.startswith("scroll") for entry in ctx.input.history))
+
     def test_authentication_error_stops_immediately(self) -> None:
         class UnauthorizedClient:
             def complete_json(self, system, user):
@@ -157,7 +166,7 @@ class TestOcrAgent(unittest.TestCase):
         task.setup(ctx)
         task.step(ctx)
         self.assertEqual(ctx.stats.actions, 1)
-        self.assertTrue(any(entry.startswith("move") for entry in ctx.input.history))
+        self.assertIn("move 20,20", ctx.input.history)
         self.assertTrue(any(entry.startswith("scroll") for entry in ctx.input.history))
 
     def test_repeated_ocr_failures_stop_the_task(self) -> None:

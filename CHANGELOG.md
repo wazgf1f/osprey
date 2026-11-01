@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.0.4] - 2026-11-01
+
+### Fixed
+
+- AI scrolls at the median of the current OCR elements instead of the virtual
+  desktop centre, so multi-monitor layouts still scroll the target window.
+- A non-finite `amount` from the model falls back to the default scroll.
+
 ## [1.0.3] - 2026-11-01
 
 ### Fixed
