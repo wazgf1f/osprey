@@ -143,6 +143,7 @@ class TestOcrAgent(unittest.TestCase):
         task.setup(ctx)
         task.step(ctx)
         self.assertEqual(ctx.stats.actions, 1)
+        self.assertTrue(any(entry.startswith("move") for entry in ctx.input.history))
         self.assertTrue(any(entry.startswith("scroll") for entry in ctx.input.history))
 
     def test_repeated_ocr_failures_stop_the_task(self) -> None:

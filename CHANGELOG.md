@@ -14,7 +14,8 @@ Keep a Changelog, and the project uses semantic versioning.
 - Editor **AI 指令…** dialog with a multi-line instruction box, optional API
   key field and dry/live runs.
 - `examples/ai_agent.py` and `examples/ai_agent.json`.
-- AI scroll action (`amount`) for targets below the fold.
+- AI scroll action (`amount`) for targets below the fold; the cursor moves to
+  the screen centre first so the wheel reaches the page.
 
 ### Fixed
 

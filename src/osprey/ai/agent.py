@@ -156,7 +156,8 @@ class OcrAgentTask(Task):
             amount = max(-10, min(10, amount))
             if amount == 0:
                 amount = -3
-            ctx.scroll(amount)
+            center = (ctx.frame.width / 2.0, ctx.frame.height / 2.0)
+            ctx.scroll(amount, center)
             self.history.append("scroll %d" % amount)
             ctx.sleep(self.tick_wait)
             return
