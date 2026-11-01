@@ -289,21 +289,26 @@ def _dedupe(items: List[OcrItem]) -> List[OcrItem]:
     kept: List[OcrItem] = []
     for item in items:
         duplicate = False
-        for other in kept:
-            if item.text != other.text:
-                continue
+        for index, other in enumerate(kept):
             ax, ay, aw, ah = item.box
             bx, by, bw, bh = other.box
             left = max(ax, bx)
             top = max(ay, by)
             right = min(ax + aw, bx + bw)
             bottom = min(ay + ah, by + bh)
-            if right > left and bottom > top:
-                overlap = (right - left) * (bottom - top)
-                union = aw * ah + bw * bh - overlap
-                if union > 0 and overlap / union > 0.5:
-                    duplicate = True
-                    break
+            if right <= left or bottom <= top:
+                continue
+            overlap = (right - left) * (bottom - top)
+            union = aw * ah + bw * bh - overlap
+            if union <= 0 or overlap / union <= 0.5:
+                continue
+            if item.text == other.text or item.text in other.text:
+                duplicate = True
+                break
+            if other.text in item.text:
+                kept[index] = item
+                duplicate = True
+                break
         if not duplicate:
             kept.append(item)
     return kept

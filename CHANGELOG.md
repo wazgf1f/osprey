@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.0.6] - 2026-11-01
+
+### Fixed
+
+- Overlapping OCR elements whose texts contain one another are merged, keeping
+  the longer text so the model sees fewer duplicate fragments.
+
 ## [1.0.5] - 2026-11-01
 
 ### Fixed

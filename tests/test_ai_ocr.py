@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from osprey.ai.ocr import _WINDOWS_SCRIPT, OcrError, default_ocr_backend, ocr_frame
+from osprey.ai.ocr import _WINDOWS_SCRIPT, OcrError, OcrItem, default_ocr_backend, ocr_frame
 
 from .helpers import make_frame, sample_template
 
@@ -31,6 +31,28 @@ class TestWindowsTimeout(unittest.TestCase):
                                 side_effect=__import__("subprocess").TimeoutExpired("x", 1)):
                     with self.assertRaises(OcrError):
                         _run_windows_ocr(image)
+
+
+class TestDedupe(unittest.TestCase):
+    def test_keeps_longer_overlapping_text(self) -> None:
+        from osprey.ai.ocr import _dedupe
+
+        items = [
+            OcrItem("目标包含点击", (0, 0, 100, 20)),
+            OcrItem("目标包含点击浏览器", (0, 0, 150, 20)),
+        ]
+        merged = _dedupe(items)
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0].text, "目标包含点击浏览器")
+
+    def test_keeps_separate_buttons(self) -> None:
+        from osprey.ai.ocr import _dedupe
+
+        items = [
+            OcrItem("上一节", (0, 0, 64, 20)),
+            OcrItem("下一节", (70, 0, 64, 20)),
+        ]
+        self.assertEqual(len(_dedupe(items)), 2)
 
 
 class TestWindowsScript(unittest.TestCase):
