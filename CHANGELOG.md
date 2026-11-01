@@ -39,6 +39,8 @@ Keep a Changelog, and the project uses semantic versioning.
   process uses STARTUPINFO instead of CREATE_NO_WINDOW.
 - AI stops after three consecutive OCR failures instead of silently running to
   the 30-step limit.
+- Windows OCR falls back to the user-profile recognizer when the Chinese
+  language pack is not installed, instead of returning no text.
 
 ## [0.1.2] - 2026-10-28
 

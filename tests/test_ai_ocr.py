@@ -9,9 +9,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from osprey.ai.ocr import default_ocr_backend, ocr_frame
+from osprey.ai.ocr import _WINDOWS_SCRIPT, default_ocr_backend, ocr_frame
 
 from .helpers import make_frame, sample_template
+
+
+class TestWindowsScript(unittest.TestCase):
+    def test_falls_back_to_profile_language_without_chinese_pack(self) -> None:
+        self.assertIn("TryCreateFromUserProfileLanguages", _WINDOWS_SCRIPT)
 
 
 class TestBackendSelection(unittest.TestCase):

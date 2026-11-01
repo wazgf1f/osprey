@@ -82,6 +82,9 @@ $bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.S
 $lang = New-Object Windows.Globalization.Language -ArgumentList "zh-Hans-CN"
 $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($lang)
 if ($null -eq $engine) {
+    $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
+}
+if ($null -eq $engine) {
     [System.IO.File]::WriteAllText($Out, '[]', (New-Object System.Text.UTF8Encoding($false)))
     exit 1
 }
