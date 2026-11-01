@@ -9,9 +9,27 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from osprey.ai.ocr import _WINDOWS_SCRIPT, default_ocr_backend, ocr_frame
+from osprey.ai.ocr import _WINDOWS_SCRIPT, OcrError, default_ocr_backend, ocr_frame
 
 from .helpers import make_frame, sample_template
+
+
+class TestWindowsTimeout(unittest.TestCase):
+    def test_timeout_becomes_ocr_error(self) -> None:
+        import numpy as np
+        from PIL import Image
+
+        from osprey.ai.ocr import _run_windows_ocr
+        from osprey.capture.base import Frame
+
+        image = Image.new("RGB", (20, 20), "white")
+        frame = Frame(np.asarray(image.convert("RGBA"))[..., [2, 1, 0, 3]])
+        with mock.patch("osprey.ai.ocr.sys.platform", "win32"):
+            with mock.patch("osprey.ai.ocr.shutil.which", return_value=sys.executable):
+                with mock.patch("osprey.ai.ocr.subprocess.run",
+                                side_effect=__import__("subprocess").TimeoutExpired("x", 1)):
+                    with self.assertRaises(OcrError):
+                        _run_windows_ocr(image)
 
 
 class TestWindowsScript(unittest.TestCase):

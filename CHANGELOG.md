@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.0.5] - 2026-11-01
+
+### Fixed
+
+- A timed-out PowerShell OCR call now raises OcrError; a slow detail tile is
+  skipped instead of failing the whole frame. Detail tiles time out at 10s.
+
 ## [1.0.4] - 2026-11-01
 
 ### Fixed

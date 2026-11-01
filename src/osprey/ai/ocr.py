@@ -206,7 +206,8 @@ def _windows_script() -> Path:
     return _SCRIPT_PATH
 
 
-def _run_windows_ocr(image, *, offset=(0, 0), scale: float = 1.0) -> List[OcrItem]:
+def _run_windows_ocr(image, *, offset=(0, 0), scale: float = 1.0,
+                    timeout: float = 30.0) -> List[OcrItem]:
     """OCR one PIL image and translate its boxes back to frame coordinates."""
     if sys.platform != "win32":
         raise OcrError("Windows OCR is only available on Windows")
@@ -228,12 +229,15 @@ def _run_windows_ocr(image, *, offset=(0, 0), scale: float = 1.0) -> List[OcrIte
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = subprocess.SW_HIDE
-        result = subprocess.run(
-            [powershell, "-STA", "-NoProfile", "-NonInteractive",
-             "-ExecutionPolicy", "Bypass", "-File", str(script),
-             "-Path", image_path, "-Out", json_path],
-            capture_output=True, timeout=30, startupinfo=startupinfo,
-        )
+        try:
+            result = subprocess.run(
+                [powershell, "-STA", "-NoProfile", "-NonInteractive",
+                 "-ExecutionPolicy", "Bypass", "-File", str(script),
+                 "-Path", image_path, "-Out", json_path],
+                capture_output=True, timeout=timeout, startupinfo=startupinfo,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise OcrError("Windows OCR timed out") from exc
         output = Path(json_path).read_text(encoding="utf-8", errors="replace").strip()
         detail = (result.stderr or b"").decode("utf-8", "replace")[:500]
     finally:
@@ -328,7 +332,7 @@ def _windows_items(frame: Frame, *, detail: bool = False) -> List[OcrItem]:
             tile = ImageOps.autocontrast(gray.crop((x, y, right, bottom)))
             big = tile.resize((tile.width * 4, tile.height * 4), Image.LANCZOS)
             try:
-                items.extend(_run_windows_ocr(big, offset=(x, y), scale=4.0))
+                items.extend(_run_windows_ocr(big, offset=(x, y), scale=4.0, timeout=10.0))
             except OcrError:
                 continue
     return _dedupe(items)
