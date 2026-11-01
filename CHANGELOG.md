@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.0.2] - 2026-11-01
+
+### Changed
+
+- Version 1.0.2 packages the current AI/OCR fixes with a refreshed installer
+  and portable build. See `docs/release-1.0.2.md` for the user-facing notes.
+
 ## [1.0.1] - 2026-10-28
 
 ### Added
