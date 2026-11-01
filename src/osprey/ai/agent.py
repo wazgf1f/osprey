@@ -17,12 +17,15 @@ SYSTEM_PROMPT = """You control a Windows desktop through OCR text boxes.
 Choose exactly one action and reply with JSON only:
 {"thought": "...", "action": "click", "element_id": 3}
 {"thought": "...", "action": "wait", "seconds": 1}
+{"thought": "...", "action": "scroll", "amount": -3}
 {"thought": "...", "action": "done"}
 Rules:
 - click only an element_id present in the list.
 - Prefer text that exactly matches the goal; use position when texts repeat.
 - The goal is semantic. "next page" may appear as 下一页, 下一节, Next, >, or a
   similar next-navigation control; choose that control when it fits the goal.
+- Do not use done only because the exact wording is missing. If the target may
+  be below the fold, use scroll (amount -3 scrolls down, 3 scrolls up).
 - Use wait when the screen is still loading.
 - Use done when the goal is already satisfied or cannot be reached.
 """
@@ -42,6 +45,7 @@ class OcrAgentTask(Task):
         self.tick_wait = 0.8
         self.steps = 0
         self.history: List[str] = []
+        self._ocr_failures = 0
 
     def setup(self, ctx: Context) -> None:
         self.goal = str(ctx.config.get("goal", "")).strip()
@@ -56,6 +60,7 @@ class OcrAgentTask(Task):
             ocr_frame, detail=True, max_items=250)
         self.steps = 0
         self.history = []
+        self._ocr_failures = 0
 
     def step(self, ctx: Context) -> None:
         if self.steps >= self.max_steps:
@@ -65,9 +70,14 @@ class OcrAgentTask(Task):
         try:
             items = self.ocr(ctx.frame)
         except Exception as exc:
-            ctx.logger.warning("OCR failed: %s", exc)
+            self._ocr_failures += 1
+            ctx.logger.warning("OCR failed (%d/3): %s", self._ocr_failures, exc)
+            if self._ocr_failures >= 3:
+                ctx.safety.request_stop("OCR failed 3 times: %s" % exc)
+                return
             ctx.sleep(self.tick_wait)
             return
+        self._ocr_failures = 0
         if not items:
             ctx.logger.info("OCR found no text; waiting")
             ctx.sleep(self.tick_wait)
@@ -136,6 +146,19 @@ class OcrAgentTask(Task):
             if not math.isfinite(seconds):
                 seconds = 1.0
             ctx.sleep(max(0.2, min(10.0, seconds)))
+            return
+
+        if kind == "scroll":
+            try:
+                amount = int(round(float(action.get("amount", -3))))
+            except (TypeError, ValueError):
+                amount = -3
+            amount = max(-10, min(10, amount))
+            if amount == 0:
+                amount = -3
+            ctx.scroll(amount)
+            self.history.append("scroll %d" % amount)
+            ctx.sleep(self.tick_wait)
             return
 
         if kind == "done":

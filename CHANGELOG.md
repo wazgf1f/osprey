@@ -14,6 +14,7 @@ Keep a Changelog, and the project uses semantic versioning.
 - Editor **AI 指令…** dialog with a multi-line instruction box, optional API
   key field and dry/live runs.
 - `examples/ai_agent.py` and `examples/ai_agent.json`.
+- AI scroll action (`amount`) for targets below the fold.
 
 ### Fixed
 
@@ -35,6 +36,8 @@ Keep a Changelog, and the project uses semantic versioning.
   visible. The prompt also accepts 下一节/Next as a "next page" control.
 - Installed builds no longer fail OCR with WinError 50; the hidden PowerShell
   process uses STARTUPINFO instead of CREATE_NO_WINDOW.
+- AI stops after three consecutive OCR failures instead of silently running to
+  the 30-step limit.
 
 ## [0.1.2] - 2026-10-28
 

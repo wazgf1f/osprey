@@ -134,6 +134,29 @@ class TestOcrAgent(unittest.TestCase):
         with self.assertRaises(Exception):
             task.setup(make_context(goal=""))
 
+    def test_scroll_action_uses_context_scroll(self) -> None:
+        items = [OcrItem("OK", (10, 10, 20, 20))]
+        task = OcrAgentTask(
+            client=FakeClient([{"action": "scroll", "amount": -3}]),
+            ocr=lambda _frame: items)
+        ctx = make_context()
+        task.setup(ctx)
+        task.step(ctx)
+        self.assertEqual(ctx.stats.actions, 1)
+        self.assertTrue(any(entry.startswith("scroll") for entry in ctx.input.history))
+
+    def test_repeated_ocr_failures_stop_the_task(self) -> None:
+        def boom(_frame):
+            raise RuntimeError("ocr boom")
+
+        task = OcrAgentTask(client=FakeClient([]), ocr=boom)
+        ctx = make_context()
+        task.setup(ctx)
+        for _ in range(3):
+            task.step(ctx)
+        self.assertTrue(ctx.safety.aborted)
+        self.assertIn("OCR failed 3 times", ctx.safety.reason or "")
+
     def test_no_text_does_not_call_the_model(self) -> None:
         client = FakeClient([])
         task = OcrAgentTask(client=client, ocr=lambda _frame: [])

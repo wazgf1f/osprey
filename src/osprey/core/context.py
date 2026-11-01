@@ -146,6 +146,15 @@ class Context:
         self.input.move_to(x, y, duration=duration)
         self.stats.actions += 1
 
+    def scroll(self, clicks: float, target: Optional[Target] = None) -> None:
+        """Scroll the wheel; positive is up, negative is down."""
+        if target is None:
+            self.input.scroll(float(clicks))
+        else:
+            x, y = self.point(target)
+            self.input.scroll(float(clicks), x, y)
+        self.stats.actions += 1
+
     def drag(self, start: Tuple[float, float], end: Tuple[float, float], *,
              duration: float = 0.35, button: str = "left") -> None:
         """Press at start, glide to end, then release."""
