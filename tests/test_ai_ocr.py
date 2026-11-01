@@ -14,6 +14,7 @@ from osprey.ai.ocr import _WINDOWS_SCRIPT, OcrError, default_ocr_backend, ocr_fr
 from .helpers import make_frame, sample_template
 
 
+@unittest.skipUnless(sys.platform == "win32", "STARTUPINFO is Windows-only")
 class TestWindowsTimeout(unittest.TestCase):
     def test_timeout_becomes_ocr_error(self) -> None:
         import numpy as np
