@@ -134,6 +134,20 @@ class TestOcrAgent(unittest.TestCase):
         with self.assertRaises(Exception):
             task.setup(make_context(goal=""))
 
+    def test_authentication_error_stops_immediately(self) -> None:
+        class UnauthorizedClient:
+            def complete_json(self, system, user):
+                raise DeepSeekError("DeepSeek HTTP 401: bad key")
+
+        task = OcrAgentTask(
+            client=UnauthorizedClient(),
+            ocr=lambda _frame: [OcrItem("OK", (10, 10, 20, 20))])
+        ctx = make_context()
+        task.setup(ctx)
+        task.step(ctx)
+        self.assertTrue(ctx.safety.aborted)
+        self.assertIn("authentication", ctx.safety.reason or "")
+
     def test_scroll_action_uses_context_scroll(self) -> None:
         items = [OcrItem("OK", (10, 10, 20, 20))]
         task = OcrAgentTask(

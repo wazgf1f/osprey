@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.0.3] - 2026-11-01
+
+### Fixed
+
+- AI stops immediately when DeepSeek returns HTTP 401/403 instead of retrying
+  OCR and API calls until the 30-step limit.
+
 ## [1.0.2] - 2026-11-01
 
 ### Changed

@@ -12,7 +12,7 @@
 Osprey 不是一个必须整套接受的框架，而是一个小而完整、容易读也容易改的引擎：
 Python + NumPy + Pillow + Win32 API。
 
-状态：**1.0.2 alpha**，Windows 10/11，Python 3.9+。
+状态：**1.0.3 alpha**，Windows 10/11，Python 3.9+。
 
 ![Osprey 计划编辑器](docs/images/editor.png)
 
@@ -63,14 +63,14 @@ Python + NumPy + Pillow + Win32 API。
 ### 方式一：Windows 安装包（不需要 Python）
 
 从 [Releases](https://github.com/wazgf1f/osprey/releases) 下载
-**Osprey-1.0.2-Setup.exe**。
+**Osprey-1.0.3-Setup.exe**。
 
 安装器会先显示**使用须知**：必须勾选“我已阅读并同意”才能继续，安装路径可自定义。
 默认装到 <code>%LOCALAPPDATA%\Programs\Osprey</code>，并在桌面和开始菜单创建快捷方式。
 
-- **升级**：从 1.0.2 起，安装器会先解压到临时目录，再整体替换旧安装目录，
+- **升级**：从 1.0.3 起，安装器会先解压到临时目录，再整体替换旧安装目录，
   不会残留旧版本文件。升级前请先关闭正在运行的 Osprey。
-- **卸载**：设置 → 应用 → **Osprey 1.0.2**，或运行安装目录下的
+- **卸载**：设置 → 应用 → **Osprey 1.0.3**，或运行安装目录下的
   <code>uninstall.bat</code>。
 - **SmartScreen**：安装包没有代码签名，Windows 可能提示“未知发布者”，
   点 **更多信息 → 仍要运行**。
@@ -80,7 +80,7 @@ Python + NumPy + Pillow + Win32 API。
 
 ### 方式二：便携版
 
-解压 **Osprey-1.0.2-win64-portable.zip**，运行 <code>osprey.bat</code> 即可。
+解压 **Osprey-1.0.3-win64-portable.zip**，运行 <code>osprey.bat</code> 即可。
 
 ### 方式三：从源码安装
 
@@ -125,7 +125,7 @@ Python + NumPy + Pillow + Win32 API。
 
     osprey doctor
 
-    osprey 1.0.2
+    osprey 1.0.3
     python      : 3.12.14
     platform    : Windows-11-10.0.26300-SP0 (AMD64)
     numpy       : 2.3.5

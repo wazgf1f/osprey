@@ -85,6 +85,11 @@ class OcrAgentTask(Task):
         try:
             action = self._decide(ctx, items)
         except Exception as exc:
+            message = str(exc)
+            if "HTTP 401" in message or "HTTP 403" in message:
+                ctx.logger.error("AI stopped: authentication failed")
+                ctx.safety.request_stop("DeepSeek authentication failed")
+                return
             ctx.logger.warning("AI decision failed: %s", exc)
             ctx.sleep(self.tick_wait)
             return
