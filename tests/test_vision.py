@@ -59,6 +59,48 @@ class TestQwenClient(unittest.TestCase):
                 client.complete_json("s", "u", "data:image/jpeg;base64,AAAA")
 
 
+class TestLoopbackOllama(unittest.TestCase):
+    def test_end_to_end_image_request(self) -> None:
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        captured = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers.get("Content-Length", "0"))
+                captured.append(json.loads(self.rfile.read(length)))
+                payload = json.dumps({
+                    "message": {"content": '{"action": "done"}'},
+                }).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, *args):
+                pass
+
+        server = HTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            port = server.server_address[1]
+            client = QwenVisionClient(
+                model="qwen2.5vl:3b",
+                base_url="http://127.0.0.1:%d" % port,
+            )
+            reply = client.complete_json(
+                "system", "user", "data:image/jpeg;base64,QUJD")
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(reply["action"], "done")
+        self.assertEqual(captured[0]["model"], "qwen2.5vl:3b")
+        self.assertEqual(captured[0]["messages"][1]["images"], ["QUJD"])
+
+
 class TestOllamaManager(unittest.TestCase):
     def test_ensure_model_pulls_missing_tag(self) -> None:
         manager = OllamaManager()
