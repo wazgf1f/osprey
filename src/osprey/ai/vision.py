@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from ..capture.base import Frame
-from ..errors import OspreyError
+from ..errors import Aborted, OspreyError
 from .deepseek import parse_json_reply
 from .ocr import OcrItem
 
@@ -109,7 +109,8 @@ class OllamaManager:
         return [str(item.get("name", "")) for item in data.get("models", [])
                 if isinstance(item, dict)]
 
-    def ensure_model(self, model: str, timeout: float = 3600.0) -> None:
+    def ensure_model(self, model: str, timeout: float = 3600.0,
+                     should_abort=None) -> None:
         if not self.is_running():
             self.start()
         names = self.models()
@@ -117,17 +118,29 @@ class OllamaManager:
             return
         exe = self.executable()
         try:
-            result = subprocess.run(
+            process = subprocess.Popen(
                 [exe, "pull", model],
-                capture_output=True,
-                timeout=timeout,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 startupinfo=_startupinfo(),
             )
-        except subprocess.TimeoutExpired as exc:
-            raise QwenVisionError("timed out pulling Ollama model %s" % model) from exc
-        if result.returncode != 0:
-            detail = (result.stderr or b"").decode("utf-8", "replace")[:600]
-            raise QwenVisionError("could not pull %s: %s" % (model, detail))
+        except OSError as exc:
+            raise QwenVisionError("could not start ollama pull: %s" % exc) from exc
+        started = time.monotonic()
+        while process.poll() is None:
+            if should_abort is not None and should_abort():
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                raise Aborted("local model download cancelled")
+            if time.monotonic() - started > timeout:
+                process.kill()
+                raise QwenVisionError("timed out pulling Ollama model %s" % model)
+            time.sleep(0.2)
+        if process.returncode != 0:
+            raise QwenVisionError("could not pull %s (exit %s)" % (model, process.returncode))
 
 
 class QwenVisionClient:
@@ -144,8 +157,8 @@ class QwenVisionClient:
         self.timeout = float(timeout)
         self.manager = manager or OllamaManager(self.base_url)
 
-    def ensure_ready(self) -> None:
-        self.manager.ensure_model(self.model)
+    def ensure_ready(self, should_abort=None) -> None:
+        self.manager.ensure_model(self.model, should_abort=should_abort)
 
     def complete_json(self, system: str, user: str, image_data_url: str) -> Dict[str, Any]:
         encoded = image_data_url.split(",", 1)[-1]

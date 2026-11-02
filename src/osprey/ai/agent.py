@@ -212,7 +212,10 @@ class VisionAgentTask(OcrAgentTask):
         if prepare is not None:
             ctx.logger.info("Preparing local Qwen-VL model %s",
                             getattr(self.vision, "model", ""))
-            prepare()
+            try:
+                prepare(should_abort=ctx.safety.check)
+            except TypeError:
+                prepare()
 
     def _decide(self, ctx: Context, items: List[OcrItem]) -> Dict[str, Any]:
         elements = []

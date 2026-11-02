@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.1.1] - 2026-11-02
+
+### Fixed
+
+- Pulling a local Qwen-VL model can now be stopped with F12; the download
+  process is polled instead of blocking until completion.
+
 ## [1.1.0] - 2026-11-02
 
 ### Added

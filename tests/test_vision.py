@@ -14,6 +14,7 @@ from PIL import Image
 from osprey.ai.ocr import OcrItem
 from osprey.ai.vision import (LOCAL_MODELS, OllamaManager, QwenVisionClient,
                               QwenVisionError, annotate_frame)
+from osprey.errors import Aborted
 from osprey.capture.base import Frame
 
 
@@ -107,17 +108,30 @@ class TestOllamaManager(unittest.TestCase):
         manager.is_running = lambda: True
         manager.models = lambda: ["qwen2.5vl:7b"]
         manager.executable = lambda: "ollama"
-        completed = mock.Mock(returncode=0, stderr=b"")
-        with mock.patch("osprey.ai.vision.subprocess.run", return_value=completed) as run:
+        process = mock.Mock(returncode=0)
+        process.poll.return_value = 0
+        with mock.patch("osprey.ai.vision.subprocess.Popen", return_value=process) as run:
             manager.ensure_model("qwen2.5vl:3b")
         run.assert_called_once()
         self.assertIn("qwen2.5vl:3b", run.call_args.args[0])
+
+    def test_model_pull_can_be_aborted(self) -> None:
+        manager = OllamaManager()
+        manager.is_running = lambda: True
+        manager.models = lambda: []
+        manager.executable = lambda: "ollama"
+        process = mock.Mock(returncode=1)
+        process.poll.return_value = None
+        with mock.patch("osprey.ai.vision.subprocess.Popen", return_value=process):
+            with self.assertRaises(Aborted):
+                manager.ensure_model("qwen2.5vl:3b", should_abort=lambda: True)
+        self.assertTrue(process.terminate.called)
 
     def test_existing_model_is_not_pulled(self) -> None:
         manager = OllamaManager()
         manager.is_running = lambda: True
         manager.models = lambda: ["qwen2.5vl:7b"]
-        with mock.patch("osprey.ai.vision.subprocess.run") as run:
+        with mock.patch("osprey.ai.vision.subprocess.Popen") as run:
             manager.ensure_model("qwen2.5vl:7b")
         run.assert_not_called()
 

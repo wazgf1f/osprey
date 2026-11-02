@@ -151,7 +151,7 @@ class TestOcrAgent(unittest.TestCase):
                 self.ready = False
                 self.image = None
 
-            def ensure_ready(self):
+            def ensure_ready(self, should_abort=None):
                 self.ready = True
 
             def complete_json(self, system, user, image):
