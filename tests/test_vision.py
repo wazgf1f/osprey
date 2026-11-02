@@ -60,6 +60,23 @@ class TestQwenClient(unittest.TestCase):
                 client.complete_json("s", "u", "data:image/jpeg;base64,AAAA")
 
 
+class TestNoImplicitDownload(unittest.TestCase):
+    def test_missing_model_raises_without_pulling(self) -> None:
+        class Manager:
+            def is_running(self):
+                return True
+
+            def has_model(self, model):
+                return False
+
+            def ensure_model(self, *args, **kwargs):
+                raise AssertionError("ensure_ready must not download")
+
+        client = QwenVisionClient(manager=Manager())
+        with self.assertRaises(QwenVisionError):
+            client.ensure_ready()
+
+
 class TestLoopbackOllama(unittest.TestCase):
     def test_end_to_end_image_request(self) -> None:
         import threading

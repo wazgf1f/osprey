@@ -31,7 +31,8 @@ from .core.engine import Engine, EngineConfig
 from .core.plan import Plan, Step
 from .core.sequence import SequenceTask
 from .ai.agent import OcrAgentTask, VisionAgentTask
-from .ai.vision import LOCAL_MODELS, MODEL_LABELS, QwenVisionClient
+from .ai.vision import (LOCAL_MODELS, MODEL_LABELS, MODEL_SIZES,
+                        OllamaManager, QwenVisionClient, QwenVisionError)
 from .errors import ConfigError
 from .vision.io import save_image
 from . import __version__
@@ -278,8 +279,8 @@ class AiDialog(tk.Toplevel):
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master)
         self.title("AI 指令（DeepSeek / 本地 Qwen-VL）")
-        self.geometry("780x680")
-        self.minsize(640, 560)
+        self.geometry("800x760")
+        self.minsize(660, 620)
         self.transient(master)
         self.result = None
 
@@ -305,6 +306,17 @@ class AiDialog(tk.Toplevel):
         ttk.Button(modes, text="安装 Ollama",
                    command=lambda: webbrowser.open("https://ollama.com/download")).pack(
             side="right")
+
+        ttk.Label(
+            frame,
+            text="本地模型：3B 约 3 GB（能用） / 7B 约 6 GB（精准）。"
+                 "只有点“下载所选本地模型”并确认后才会下载。",
+            foreground=PALETTE["muted"],
+            wraplength=740,
+        ).pack(anchor="w", pady=(0, 4))
+        self.download_button = ttk.Button(
+            frame, text="下载所选本地模型", command=self._download_model)
+        self.download_button.pack(anchor="w", pady=(0, 8))
 
         ttk.Label(frame, text="DeepSeek API Key（仅文本模式；留空读取 DEEPSEEK_API_KEY）").pack(anchor="w")
         self.key_var = tk.StringVar(value="")
@@ -357,6 +369,45 @@ class AiDialog(tk.Toplevel):
             "live": live,
         }
         self.destroy()
+
+    def _download_model(self) -> None:
+        mode = self.mode_var.get()
+        if mode == "deepseek":
+            messagebox.showinfo("本地模型", "当前是 DeepSeek 文本模式，不需要下载本地模型。",
+                                parent=self)
+            return
+        tier = "7b" if mode == "qwen7b" else "3b"
+        model = LOCAL_MODELS[tier]
+        size = MODEL_SIZES[tier]
+        if not messagebox.askyesno(
+            "下载本地模型",
+            "将下载 %s 到本机，大小 %s。\n\n下载会调用 ollama pull，"
+            "首次可能较慢；下载期间可以关闭窗口，但模型下载可能继续。\n\n继续吗？"
+            % (model, size),
+            parent=self,
+        ):
+            return
+        self.download_button.configure(state="disabled", text="下载中…")
+
+        def worker():
+            try:
+                OllamaManager().ensure_model(model)
+            except Exception as exc:
+                self.after(0, lambda: self._download_finished(exc))
+            else:
+                self.after(0, lambda: self._download_finished(None))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _download_finished(self, exc: Optional[Exception]) -> None:
+        try:
+            self.download_button.configure(state="normal", text="下载所选本地模型")
+        except tk.TclError:
+            return
+        if exc is not None:
+            messagebox.showerror("下载失败", str(exc), parent=self)
+        else:
+            messagebox.showinfo("下载完成", "本地模型已就绪，可以开始运行。", parent=self)
 
     def _cancel(self) -> None:
         self.result = None
@@ -959,8 +1010,23 @@ class PlanEditor:
             label = "AI 运行中…" if not result["live"] else "AI 真实运行中…"
         else:
             tier = "7b" if mode == "qwen7b" else "3b"
-            task = VisionAgentTask(
-                vision=QwenVisionClient(model=LOCAL_MODELS[tier]))
+            model = LOCAL_MODELS[tier]
+            manager = OllamaManager()
+            try:
+                if not manager.is_running():
+                    manager.start()
+                if not manager.has_model(model):
+                    messagebox.showwarning(
+                        "模型未下载",
+                        "本地模型 %s 未下载（%s）。\n请先在 AI 指令框里点"
+                        "“下载所选本地模型”。" % (model, MODEL_SIZES[tier]),
+                        parent=self.root,
+                    )
+                    return
+            except QwenVisionError as exc:
+                messagebox.showerror("本地模型不可用", str(exc), parent=self.root)
+                return
+            task = VisionAgentTask(vision=QwenVisionClient(model=model))
             label = ("本地 Qwen-VL %s 运行中…" % MODEL_LABELS[tier]
                      + ("（试运行）" if not result["live"] else ""))
         self._start_task(

@@ -30,6 +30,10 @@ MODEL_LABELS = {
     "3b": "Qwen-VL 3B（能用）",
     "7b": "Qwen-VL 7B（精准）",
 }
+MODEL_SIZES = {
+    "3b": "约 3 GB",
+    "7b": "约 6 GB",
+}
 OLLAMA_URL = "http://127.0.0.1:11434"
 
 
@@ -109,6 +113,9 @@ class OllamaManager:
         return [str(item.get("name", "")) for item in data.get("models", [])
                 if isinstance(item, dict)]
 
+    def has_model(self, model: str) -> bool:
+        return model in self.models() if self.is_running() else False
+
     def ensure_model(self, model: str, timeout: float = 3600.0,
                      should_abort=None) -> None:
         if not self.is_running():
@@ -158,7 +165,13 @@ class QwenVisionClient:
         self.manager = manager or OllamaManager(self.base_url)
 
     def ensure_ready(self, should_abort=None) -> None:
-        self.manager.ensure_model(self.model, should_abort=should_abort)
+        """Verify the model exists; never download implicitly."""
+        if not self.manager.is_running():
+            self.manager.start()
+        if not self.manager.has_model(self.model):
+            raise QwenVisionError(
+                "local model %s is not downloaded; open AI 指令 → 本地模型 "
+                "and click 下载所选模型 first" % self.model)
 
     def complete_json(self, system: str, user: str, image_data_url: str) -> Dict[str, Any]:
         encoded = image_data_url.split(",", 1)[-1]

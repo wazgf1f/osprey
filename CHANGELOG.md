@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.1.2] - 2026-11-02
+
+### Changed
+
+- Local Qwen-VL models are no longer downloaded implicitly. The AI dialog shows
+  the 3B (~3 GB) and 7B (~6 GB) sizes and downloads only after the user clicks
+  "下载所选本地模型" and confirms.
+
 ## [1.1.1] - 2026-11-02
 
 ### Fixed
