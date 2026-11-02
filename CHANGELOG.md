@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.1.3] - 2026-11-02
+
+### Fixed
+
+- AI dialog model choices wrap to two rows and the goal text box is narrower,
+  so the dialog fits an 800px-wide window without clipping.
+
 ## [1.1.2] - 2026-11-02
 
 ### Changed

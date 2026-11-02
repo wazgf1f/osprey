@@ -288,7 +288,7 @@ class AiDialog(tk.Toplevel):
         frame.pack(fill="both", expand=True)
 
         ttk.Label(frame, text="给 AI 的指令").pack(anchor="w")
-        self.text = tk.Text(frame, height=6, wrap="word", font=(FONT, 10))
+        self.text = tk.Text(frame, height=6, width=60, wrap="word", font=(FONT, 10))
         self.text.pack(fill="both", expand=True, pady=(6, 10))
         self.text.insert("1.0", "打开 Windows 设置并点击“系统”")
         self.text.focus_set()

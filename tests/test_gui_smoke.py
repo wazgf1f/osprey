@@ -280,6 +280,25 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
+    def test_ai_dialog_can_cancel_model_download(self) -> None:
+        import tkinter as tk
+
+        from osprey.gui import AiDialog, PlanEditor
+
+        try:
+            editor = PlanEditor()
+        except tk.TclError as exc:  # pragma: no cover - headless session
+            self.skipTest("no display available: %s" % exc)
+
+        try:
+            dialog = AiDialog(editor.root)
+            self.assertFalse(dialog._download_cancel.is_set())
+            dialog._cancel_download()
+            self.assertTrue(dialog._download_cancel.is_set())
+        finally:
+            logging.getLogger("osprey").removeHandler(editor._log_handler)
+            editor.root.destroy()
+
     def test_step_dialog_keeps_drag_fields(self) -> None:
         import tkinter as tk
 
