@@ -10,6 +10,8 @@ Keep a Changelog, and the project uses semantic versioning.
 - Local Qwen-VL models are no longer downloaded implicitly. The AI dialog shows
   the 3B (~3 GB) and 7B (~6 GB) sizes and downloads only after the user clicks
   "下载所选本地模型" and confirms.
+- A model download can be cancelled from the dialog (or by closing it); the
+  ollama pull process is terminated.
 
 ## [1.1.1] - 2026-11-02
 

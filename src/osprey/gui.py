@@ -33,7 +33,7 @@ from .core.sequence import SequenceTask
 from .ai.agent import OcrAgentTask, VisionAgentTask
 from .ai.vision import (LOCAL_MODELS, MODEL_LABELS, MODEL_SIZES,
                         OllamaManager, QwenVisionClient, QwenVisionError)
-from .errors import ConfigError
+from .errors import Aborted, ConfigError
 from .vision.io import save_image
 from . import __version__
 from .win32util import enable_dpi_awareness
@@ -295,17 +295,20 @@ class AiDialog(tk.Toplevel):
 
         ttk.Label(frame, text="决策模型").pack(anchor="w")
         self.mode_var = tk.StringVar(value="deepseek")
+        self._download_cancel = threading.Event()
         modes = ttk.Frame(frame)
-        modes.pack(fill="x", pady=(4, 8))
+        modes.pack(fill="x", pady=(4, 2))
         ttk.Radiobutton(modes, text="DeepSeek 文本（OCR）", value="deepseek",
                         variable=self.mode_var).pack(side="left")
-        ttk.Radiobutton(modes, text="本地 Qwen-VL 3B（能用）", value="qwen3b",
-                        variable=self.mode_var).pack(side="left", padx=(10, 0))
-        ttk.Radiobutton(modes, text="本地 Qwen-VL 7B（精准）", value="qwen7b",
-                        variable=self.mode_var).pack(side="left", padx=(10, 0))
         ttk.Button(modes, text="安装 Ollama",
                    command=lambda: webbrowser.open("https://ollama.com/download")).pack(
             side="right")
+        local_modes = ttk.Frame(frame)
+        local_modes.pack(fill="x", pady=(0, 8))
+        ttk.Radiobutton(local_modes, text="本地 Qwen-VL 3B（能用）", value="qwen3b",
+                        variable=self.mode_var).pack(side="left")
+        ttk.Radiobutton(local_modes, text="本地 Qwen-VL 7B（精准）", value="qwen7b",
+                        variable=self.mode_var).pack(side="left", padx=(14, 0))
 
         ttk.Label(
             frame,
@@ -314,9 +317,14 @@ class AiDialog(tk.Toplevel):
             foreground=PALETTE["muted"],
             wraplength=740,
         ).pack(anchor="w", pady=(0, 4))
+        download_row = ttk.Frame(frame)
+        download_row.pack(anchor="w", pady=(0, 8))
         self.download_button = ttk.Button(
-            frame, text="下载所选本地模型", command=self._download_model)
-        self.download_button.pack(anchor="w", pady=(0, 8))
+            download_row, text="下载所选本地模型", command=self._download_model)
+        self.download_button.pack(side="left")
+        self.cancel_download_button = ttk.Button(
+            download_row, text="取消下载", command=self._cancel_download, state="disabled")
+        self.cancel_download_button.pack(side="left", padx=(8, 0))
 
         ttk.Label(frame, text="DeepSeek API Key（仅文本模式；留空读取 DEEPSEEK_API_KEY）").pack(anchor="w")
         self.key_var = tk.StringVar(value="")
@@ -387,11 +395,14 @@ class AiDialog(tk.Toplevel):
             parent=self,
         ):
             return
+        self._download_cancel.clear()
         self.download_button.configure(state="disabled", text="下载中…")
+        self.cancel_download_button.configure(state="normal")
 
         def worker():
             try:
-                OllamaManager().ensure_model(model)
+                OllamaManager().ensure_model(
+                    model, should_abort=self._download_cancel.is_set)
             except Exception as exc:
                 self.after(0, lambda: self._download_finished(exc))
             else:
@@ -399,17 +410,28 @@ class AiDialog(tk.Toplevel):
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def _cancel_download(self) -> None:
+        self._download_cancel.set()
+        try:
+            self.cancel_download_button.configure(state="disabled")
+        except tk.TclError:
+            pass
+
     def _download_finished(self, exc: Optional[Exception]) -> None:
         try:
             self.download_button.configure(state="normal", text="下载所选本地模型")
+            self.cancel_download_button.configure(state="disabled")
         except tk.TclError:
             return
-        if exc is not None:
+        if isinstance(exc, Aborted):
+            messagebox.showinfo("已取消", "模型下载已取消。", parent=self)
+        elif exc is not None:
             messagebox.showerror("下载失败", str(exc), parent=self)
         else:
             messagebox.showinfo("下载完成", "本地模型已就绪，可以开始运行。", parent=self)
 
     def _cancel(self) -> None:
+        self._download_cancel.set()
         self.result = None
         self.destroy()
 
