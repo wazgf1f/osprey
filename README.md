@@ -14,7 +14,7 @@ Osprey is a small, readable engine and library rather than a framework you have
 to adopt wholesale. The core is plain Python on top of NumPy, Pillow and the
 Win32 API.
 
-Status: **1.0.6 alpha**, Windows 10/11, Python 3.9+.
+Status: **1.1.0 alpha**, Windows 10/11, Python 3.9+.
 
 ![The Osprey plan editor](docs/images/editor.png)
 
@@ -43,7 +43,7 @@ It is:
 It is not:
 
 - a memory reader, DLL injector or packet manipulator;
-- an OCR or LLM agent - vision is template matching, and OCR belongs in your task;
+- a cloud-only agent - local Qwen-VL keeps screenshots on this machine;
 - a tool for faking attendance, exams or any other academic credit. See
   **Responsible use**.
 
@@ -67,7 +67,7 @@ It is not:
 
 ### Windows installer (no Python required)
 
-Download **Osprey-1.0.6-Setup.exe** from
+Download **Osprey-1.1.0-Setup.exe** from
 [Releases](https://github.com/wazgf1f/osprey/releases).
 
 The installer shows the terms of use first: you must tick "I have read and
@@ -75,10 +75,10 @@ agree" to continue, and the install path is customisable. It installs to
 <code>%LOCALAPPDATA%\Programs\Osprey</code> and adds Desktop and Start Menu
 shortcuts.
 
-- **Upgrades:** from 1.0.6 the installer extracts to a staging directory and
+- **Upgrades:** from 1.1.0 the installer extracts to a staging directory and
   replaces the existing installation, so old files do not survive an update.
   Close Osprey before installing a new version.
-- **Uninstall:** Settings -> Apps -> **Osprey 1.0.6**, or run
+- **Uninstall:** Settings -> Apps -> **Osprey 1.1.0**, or run
   <code>uninstall.bat</code> from the install directory.
 - **SmartScreen:** the executable is unsigned, so Windows may warn about an
   unknown publisher. Choose **More info**, then **Run anyway**.
@@ -89,7 +89,7 @@ all consequences of use.
 
 ### Portable
 
-Unzip **Osprey-1.0.6-win64-portable.zip** and run <code>osprey.bat</code>.
+Unzip **Osprey-1.1.0-win64-portable.zip** and run <code>osprey.bat</code>.
 
 ### From source
 
@@ -140,7 +140,7 @@ Check the environment first:
 
     osprey doctor
 
-    osprey 1.0.6
+    osprey 1.1.0
     python      : 3.12.14
     platform    : Windows-11-10.0.26300-SP0 (AMD64)
     numpy       : 2.3.5
@@ -171,10 +171,10 @@ The find output contains frame-relative coordinates and the desktop coordinate:
 
 Use the <code>desktop=(x, y)</code> value when clicking.
 
-### AI instruction box (OCR + DeepSeek)
+### AI instruction box (DeepSeek / local Qwen-VL)
 
-The editor has an **AI 指令…** button. It opens a dialog with a multi-line text
-box for the goal, an optional DeepSeek API key and a step limit.
+The editor has an **AI 指令…** button. The dialog contains a multi-line goal,
+a model selector, an optional DeepSeek key (text mode only) and a step limit.
 
 ![AI instruction box](docs/images/ai-dialog.png)
 
@@ -194,8 +194,26 @@ The same agent runs from the CLI:
     set DEEPSEEK_API_KEY=sk-...
     osprey run examples/ai_agent.py --config examples/ai_agent.json --live
 
-The model receives OCR text boxes, not screenshots. It only chooses an element
-id; Osprey performs the click through the normal input layer.
+### Local Qwen-VL 3B / 7B
+
+Choose **本地 Qwen-VL 3B（能用）** or **7B（精准）** in the dialog to let the
+model see the whole desktop with numbered OCR boxes. Screenshots and the model
+stay on this machine.
+
+1. Install [Ollama](https://ollama.com/download).
+2. The first local run pulls the model automatically: about 3 GB for 3B and
+   6 GB for 7B. 7B is happier with 8 GB+ VRAM; CPU works but is slower.
+3. OCR still supplies the click coordinates; Qwen-VL only chooses the element
+   id, so the model never guesses pixels.
+
+CLI local mode:
+
+    set OSPREY_AI_PROVIDER=qwen-local
+    set OSPREY_AI_MODEL=7b
+    osprey run examples/ai_agent.py --config examples/ai_agent.json --live
+
+In text mode the model receives OCR text boxes, not screenshots. In both modes
+Osprey performs the click through the normal input layer.
 
 ### Plan file
 

@@ -254,7 +254,28 @@ class TestGuiSmoke(unittest.TestCase):
             self.assertEqual(dialog.result["goal"], "click the OK button")
             self.assertEqual(dialog.result["max_steps"], 5)
             self.assertEqual(dialog.result["api_key"], "sk-test")
+            self.assertEqual(dialog.result["mode"], "deepseek")
             self.assertFalse(dialog.result["live"])
+        finally:
+            logging.getLogger("osprey").removeHandler(editor._log_handler)
+            editor.root.destroy()
+
+    def test_ai_dialog_can_select_local_qwen(self) -> None:
+        import tkinter as tk
+
+        from osprey.gui import AiDialog, PlanEditor
+
+        try:
+            editor = PlanEditor()
+        except tk.TclError as exc:  # pragma: no cover - headless session
+            self.skipTest("no display available: %s" % exc)
+
+        try:
+            dialog = AiDialog(editor.root)
+            dialog.mode_var.set("qwen7b")
+            dialog._start(False)
+            self.assertEqual(dialog.result["mode"], "qwen7b")
+            self.assertIsNone(dialog.result["api_key"])
         finally:
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()

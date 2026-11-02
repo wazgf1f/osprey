@@ -1,18 +1,29 @@
-"""OCR + DeepSeek agent.
+"""OCR + DeepSeek or local Qwen-VL agent.
 
-Install the optional OCR dependency and set a key:
+DeepSeek text mode:
 
-    pip install -e ".[ai]"
     set DEEPSEEK_API_KEY=sk-...
-
-Then run the plan with the engine:
-
     osprey run examples/ai_agent.py --config examples/ai_agent.json
-    osprey run examples/ai_agent.py --config examples/ai_agent.json --live
+
+Local Qwen-VL through Ollama (install Ollama first):
+
+    set OSPREY_AI_PROVIDER=qwen-local
+    set OSPREY_AI_MODEL=7b
+    osprey run examples/ai_agent.py --config examples/ai_agent.json
+
+3B is the "usable" tier; 7B is the more precise tier.
 """
 
-from osprey.ai.agent import OcrAgentTask
+import os
+
+from osprey.ai.agent import OcrAgentTask, VisionAgentTask
+from osprey.ai.vision import LOCAL_MODELS, QwenVisionClient
 
 
-def create_task() -> OcrAgentTask:
+def create_task():
+    provider = os.environ.get("OSPREY_AI_PROVIDER", "deepseek").strip().lower()
+    if provider in ("qwen", "qwen-local", "qwen_vl", "local"):
+        tier = os.environ.get("OSPREY_AI_MODEL", "7b").strip().lower()
+        model = LOCAL_MODELS.get(tier, tier)
+        return VisionAgentTask(vision=QwenVisionClient(model=model))
     return OcrAgentTask()

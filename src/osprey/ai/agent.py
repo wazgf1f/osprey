@@ -12,6 +12,7 @@ from ..core.task import Task
 from ..errors import ConfigError
 from .deepseek import DeepSeekClient
 from .ocr import OcrItem, default_ocr_backend, ocr_frame
+from .vision import annotate_frame
 
 SYSTEM_PROMPT = """You control a Windows desktop through OCR text boxes.
 Choose exactly one action and reply with JSON only:
@@ -28,6 +29,24 @@ Rules:
   be below the fold, use scroll (amount -3 scrolls down, 3 scrolls up).
 - Use wait when the screen is still loading.
 - Use done when the goal is already satisfied or cannot be reached.
+"""
+
+
+VISION_SYSTEM_PROMPT = """You control a Windows desktop and can see a screenshot.
+The screenshot has red OCR boxes, each labelled with an element id.
+Choose exactly one action and reply with JSON only:
+{"thought": "...", "action": "click", "element_id": 3}
+{"thought": "...", "action": "wait", "seconds": 1}
+{"thought": "...", "action": "scroll", "amount": -3}
+{"thought": "...", "action": "done"}
+Rules:
+- Use the screenshot, the OCR text list and the user's language goal together.
+- click only an element_id that exists in the list; never invent coordinates.
+- Prefer the control that best matches the user's intent, even if the wording
+  differs (for example 下一页 may appear as 下一节, Next or >).
+- If the target is below the fold, use scroll (negative scrolls down).
+- Use wait when the screen is still loading.
+- Use done only when the goal is satisfied or clearly impossible.
 """
 
 
@@ -176,3 +195,45 @@ class OcrAgentTask(Task):
 
         ctx.logger.warning("AI returned an unsupported action: %r", kind)
         ctx.sleep(self.tick_wait)
+
+
+class VisionAgentTask(OcrAgentTask):
+    """Qwen-VL sees an annotated screenshot, but OCR boxes still own the click."""
+
+    name = "vision-ai-agent"
+
+    def __init__(self, *, vision, ocr=None) -> None:
+        super().__init__(client=vision, ocr=ocr)
+        self.vision = vision
+
+    def setup(self, ctx: Context) -> None:
+        super().setup(ctx)
+        prepare = getattr(self.vision, "ensure_ready", None)
+        if prepare is not None:
+            ctx.logger.info("Preparing local Qwen-VL model %s",
+                            getattr(self.vision, "model", ""))
+            prepare()
+
+    def _decide(self, ctx: Context, items: List[OcrItem]) -> Dict[str, Any]:
+        elements = []
+        for index, item in enumerate(items):
+            x, y, width, height = item.box
+            elements.append({
+                "id": index,
+                "text": item.text,
+                "box": [x, y, width, height],
+                "center": [round(item.center[0], 1), round(item.center[1], 1)],
+            })
+        payload = {
+            "goal": self.goal,
+            "screen": [ctx.frame.width, ctx.frame.height],
+            "elements": elements,
+            "history": self.history[-8:],
+        }
+        image = annotate_frame(ctx.frame, items)
+        reply = self.vision.complete_json(
+            VISION_SYSTEM_PROMPT, json.dumps(payload, ensure_ascii=False), image)
+        thought = str(reply.get("thought", "")).strip()
+        if thought:
+            ctx.logger.info("AI: %s", thought)
+        return reply

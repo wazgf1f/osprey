@@ -6,7 +6,7 @@ import json
 import unittest
 from unittest import mock
 
-from osprey.ai.agent import OcrAgentTask
+from osprey.ai.agent import OcrAgentTask, VisionAgentTask
 from osprey.ai.deepseek import DeepSeekClient, DeepSeekError, parse_json_reply
 from osprey.ai.ocr import OcrError, OcrItem
 from osprey.errors import OspreyError
@@ -142,6 +142,32 @@ class TestOcrAgent(unittest.TestCase):
         task.setup(ctx)
         task.step(ctx)
         self.assertTrue(any(entry.startswith("scroll") for entry in ctx.input.history))
+
+    def test_vision_task_sends_annotated_image(self) -> None:
+        class FakeVision:
+            model = "qwen2.5vl:3b"
+
+            def __init__(self):
+                self.ready = False
+                self.image = None
+
+            def ensure_ready(self):
+                self.ready = True
+
+            def complete_json(self, system, user, image):
+                self.image = image
+                return {"action": "click", "element_id": 0}
+
+        vision = FakeVision()
+        task = VisionAgentTask(
+            vision=vision,
+            ocr=lambda _frame: [OcrItem("OK", (10, 10, 20, 20))])
+        ctx = make_context()
+        task.setup(ctx)
+        task.step(ctx)
+        self.assertTrue(vision.ready)
+        self.assertTrue(vision.image.startswith("data:image/jpeg;base64,"))
+        self.assertEqual(ctx.stats.actions, 1)
 
     def test_authentication_error_stops_immediately(self) -> None:
         class UnauthorizedClient:

@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.1.0] - 2026-11-02
+
+### Added
+
+- Local Qwen-VL 3B/7B decision mode through Ollama. The model sees an annotated
+  screenshot; OCR boxes still provide the click coordinates.
+- GUI model selector, Ollama install link, automatic model pull and the
+  OSPREY_AI_PROVIDER=qwen-local CLI path.
+
 ## [1.0.6] - 2026-11-01
 
 ### Fixed

@@ -20,6 +20,7 @@ import sys
 import threading
 import time
 import tkinter as tk
+import webbrowser
 from tkinter import filedialog, messagebox, ttk
 from typing import List, Optional
 
@@ -29,7 +30,8 @@ from .capture.gdi import GdiGrabber
 from .core.engine import Engine, EngineConfig
 from .core.plan import Plan, Step
 from .core.sequence import SequenceTask
-from .ai.agent import OcrAgentTask
+from .ai.agent import OcrAgentTask, VisionAgentTask
+from .ai.vision import LOCAL_MODELS, MODEL_LABELS, QwenVisionClient
 from .errors import ConfigError
 from .vision.io import save_image
 from . import __version__
@@ -271,28 +273,42 @@ class StepDialog(tk.Toplevel):
 
 
 class AiDialog(tk.Toplevel):
-    """Text box for the DeepSeek goal plus an optional API key."""
+    """Text goal plus DeepSeek text or local Qwen-VL selection."""
 
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master)
-        self.title("AI 指令（OCR + DeepSeek）")
-        self.geometry("760x560")
-        self.minsize(620, 460)
+        self.title("AI 指令（DeepSeek / 本地 Qwen-VL）")
+        self.geometry("780x680")
+        self.minsize(640, 560)
         self.transient(master)
         self.result = None
 
         frame = ttk.Frame(self, padding=14)
         frame.pack(fill="both", expand=True)
 
-        ttk.Label(frame, text="给 DeepSeek 的指令").pack(anchor="w")
-        self.text = tk.Text(frame, height=7, wrap="word", font=(FONT, 10))
+        ttk.Label(frame, text="给 AI 的指令").pack(anchor="w")
+        self.text = tk.Text(frame, height=6, wrap="word", font=(FONT, 10))
         self.text.pack(fill="both", expand=True, pady=(6, 10))
         self.text.insert("1.0", "打开 Windows 设置并点击“系统”")
         self.text.focus_set()
 
-        ttk.Label(frame, text="DeepSeek API Key（留空则读取 DEEPSEEK_API_KEY）").pack(anchor="w")
+        ttk.Label(frame, text="决策模型").pack(anchor="w")
+        self.mode_var = tk.StringVar(value="deepseek")
+        modes = ttk.Frame(frame)
+        modes.pack(fill="x", pady=(4, 8))
+        ttk.Radiobutton(modes, text="DeepSeek 文本（OCR）", value="deepseek",
+                        variable=self.mode_var).pack(side="left")
+        ttk.Radiobutton(modes, text="本地 Qwen-VL 3B（能用）", value="qwen3b",
+                        variable=self.mode_var).pack(side="left", padx=(10, 0))
+        ttk.Radiobutton(modes, text="本地 Qwen-VL 7B（精准）", value="qwen7b",
+                        variable=self.mode_var).pack(side="left", padx=(10, 0))
+        ttk.Button(modes, text="安装 Ollama",
+                   command=lambda: webbrowser.open("https://ollama.com/download")).pack(
+            side="right")
+
+        ttk.Label(frame, text="DeepSeek API Key（仅文本模式；留空读取 DEEPSEEK_API_KEY）").pack(anchor="w")
         self.key_var = tk.StringVar(value="")
-        ttk.Entry(frame, textvariable=self.key_var, show="*").pack(fill="x", pady=(4, 10))
+        ttk.Entry(frame, textvariable=self.key_var, show="*").pack(fill="x", pady=(4, 8))
 
         row = ttk.Frame(frame)
         row.pack(fill="x", pady=(0, 8))
@@ -303,9 +319,10 @@ class AiDialog(tk.Toplevel):
 
         ttk.Label(
             frame,
-            text="识别默认使用 Windows 自带 OCR；可选 RapidOCR：pip install -e \".[ai]\"\n"
-                 "AI 只返回要点击的 OCR 元素，点击仍由 Osprey 执行。",
+            text="本地 Qwen-VL 需要先安装 Ollama；3B 约 3GB，7B 约 6GB，首次运行会自动下载。\n"
+                 "OCR 负责精确框，模型只选择元素 ID，点击仍由 Osprey 执行。",
             foreground=PALETTE["muted"],
+            wraplength=720,
         ).pack(anchor="w", pady=(4, 10))
 
         buttons = ttk.Frame(frame)
@@ -334,6 +351,7 @@ class AiDialog(tk.Toplevel):
             return
         self.result = {
             "goal": goal,
+            "mode": self.mode_var.get(),
             "api_key": self.key_var.get().strip() or None,
             "max_steps": max(1, min(200, steps)),
             "live": live,
@@ -935,13 +953,23 @@ class PlanEditor:
             parent=self.root,
         ):
             return
+        mode = result.get("mode", "deepseek")
+        if mode == "deepseek":
+            task = OcrAgentTask(api_key=result["api_key"])
+            label = "AI 运行中…" if not result["live"] else "AI 真实运行中…"
+        else:
+            tier = "7b" if mode == "qwen7b" else "3b"
+            task = VisionAgentTask(
+                vision=QwenVisionClient(model=LOCAL_MODELS[tier]))
+            label = ("本地 Qwen-VL %s 运行中…" % MODEL_LABELS[tier]
+                     + ("（试运行）" if not result["live"] else ""))
         self._start_task(
-            OcrAgentTask(api_key=result["api_key"]),
+            task,
             result["live"],
             {"goal": result["goal"], "all_screens": True,
              "ai_max_steps": result["max_steps"], "ai_tick_wait": 0.8},
             1.0,
-            "AI 运行中…" if not result["live"] else "AI 真实运行中…",
+            label,
             hide_editor=True,
         )
 
