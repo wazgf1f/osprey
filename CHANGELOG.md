@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.2.1] - 2026-11-03
+
+### Added
+
+- Window fade-in, a moving accent line in the header, primary-button hover
+  colour transitions and a breathing status dot while running.
+
 ## [1.2.0] - 2026-11-03
 
 ### Changed

@@ -15,6 +15,7 @@ import copy
 import ctypes
 import datetime
 import logging
+import math
 import os
 import sys
 import threading
@@ -62,6 +63,22 @@ PALETTE = {
     "header": "#070D18",
     "header_sub": "#8FA6C7",
 }
+
+
+def _hex_rgb(value: str) -> tuple:
+    value = value.lstrip("#")
+    return tuple(int(value[index:index + 2], 16) for index in (0, 2, 4))
+
+
+def _rgb_hex(rgb) -> str:
+    return "#%02x%02x%02x" % tuple(max(0, min(255, int(round(v)))) for v in rgb)
+
+
+def _blend(start: str, end: str, t: float) -> str:
+    t = max(0.0, min(1.0, t))
+    a = _hex_rgb(start)
+    b = _hex_rgb(end)
+    return _rgb_hex(tuple(a[i] + (b[i] - a[i]) * t for i in range(3)))
 
 
 def _window_geometry(screen_w: int, screen_h: int) -> tuple:
@@ -600,9 +617,16 @@ class PlanEditor:
         self._closing = False
         self._hidden_for_run = False
         self._log_handler: Optional[_LogHandler] = None
+        self._anim_token = {}
+        self._status_kind = "ok"
+        self._pulse_phase = 0.0
+        self._pulse_job = None
+        self._header_job = None
+        self._fade_job = None
 
         self._build()
         self._install_logging()
+        self._fade_in()
 
         if plan_path:
             self._open_path(plan_path)
@@ -679,6 +703,10 @@ class PlanEditor:
         header = tk.Canvas(self.root, bg=PALETTE["header"], height=86,
                            highlightthickness=0, bd=0)
         header.grid(row=0, column=0, sticky="ew")
+        self.header_canvas = header
+        self.header_width = 1000
+        self.header_line = header.create_line(
+            -160, 83, 0, 83, fill=PALETTE["accent"], width=2)
         header.create_text(20, 10, text="Osprey", anchor="nw", fill="#FFFFFF",
                            font=(FONT, 18, "bold"))
         header.create_text(22, 55, text="屏幕视觉自动化 · 点击顺序与间隔",
@@ -686,8 +714,12 @@ class PlanEditor:
         version_id = header.create_text(18, 18, text="v" + __version__,
                                         anchor="ne", fill=PALETTE["header_sub"],
                                         font=(FONT, 9))
-        header.bind("<Configure>",
-                    lambda event: header.coords(version_id, event.width - 18, 18))
+        def resize_header(event):
+            self.header_width = max(1, event.width)
+            header.coords(version_id, event.width - 18, 18)
+
+        header.bind("<Configure>", resize_header)
+        self._animate_header()
 
         toolbar = ttk.Frame(self.root, padding=(12, 10, 12, 2))
         toolbar.grid(row=1, column=0, sticky="ew")
@@ -702,6 +734,7 @@ class PlanEditor:
             cursor="hand2", font=(FONT, 10, "bold"),
         )
         self.capture_button.pack(side="left")
+        self._bind_hover(self.capture_button, PALETTE["accent"], "#60A5FA")
         self._edit_buttons.append(self.capture_button)
         for label, command in (
             ("添加点击", self._add_click),
@@ -815,6 +848,7 @@ class PlanEditor:
             cursor="hand2", font=(FONT, 10, "bold"),
         )
         self.live_button.pack(side="right", padx=(0, 8))
+        self._bind_hover(self.live_button, PALETTE["accent"], "#60A5FA")
         self.dry_button = ttk.Button(actions, text="▷  试运行",
                                      command=lambda: self._run(False), style="Tool.TButton")
         self.dry_button.pack(side="right", padx=(0, 8))
@@ -1351,16 +1385,111 @@ class PlanEditor:
         self.base_dir = os.path.dirname(self.plan_path)
         self._set_status("已保存 %s" % self.plan_path)
 
+    # -- animation ---------------------------------------------------------
+    def _bind_hover(self, button: tk.Button, normal: str, hover: str) -> None:
+        def animate(target: str) -> None:
+            token = self._anim_token.get(id(button), 0) + 1
+            self._anim_token[id(button)] = token
+            try:
+                current = button.cget("bg")
+            except tk.TclError:
+                return
+
+            def step(index: int) -> None:
+                if self._closing or self._anim_token.get(id(button)) != token:
+                    return
+                try:
+                    if not button.winfo_exists():
+                        return
+                    button.configure(bg=_blend(current, target, index / 7.0))
+                except tk.TclError:
+                    return
+                if index < 7:
+                    self.root.after(16, lambda: step(index + 1))
+
+            step(0)
+
+        button.bind("<Enter>", lambda _event: animate(hover), add="+")
+        button.bind("<Leave>", lambda _event: animate(normal), add="+")
+
+    def _animate_header(self) -> None:
+        if self._closing:
+            return
+        try:
+            if not self.header_canvas.winfo_exists():
+                return
+            x = getattr(self, "_header_x", -160.0) + 7.0
+            if x > self.header_width + 160:
+                x = -160.0
+            self._header_x = x
+            self.header_canvas.coords(self.header_line, x - 160, 83, x, 83)
+        except tk.TclError:
+            return
+        self._header_job = self.root.after(40, self._animate_header)
+
+    def _fade_in(self, step: int = 0) -> None:
+        if self._closing:
+            return
+        try:
+            self.root.attributes("-alpha", min(1.0, step / 12.0))
+        except tk.TclError:
+            return
+        if step < 12:
+            self._fade_job = self.root.after(18, lambda: self._fade_in(step + 1))
+
+    def _start_pulse(self) -> None:
+        if self._pulse_job is None:
+            self._pulse_phase = 0.0
+            self._pulse_tick()
+
+    def _stop_pulse(self) -> None:
+        if self._pulse_job is not None:
+            try:
+                self.root.after_cancel(self._pulse_job)
+            except tk.TclError:
+                pass
+            self._pulse_job = None
+
+    def _pulse_tick(self) -> None:
+        if self._closing or self._status_kind != "run":
+            self._pulse_job = None
+            return
+        self._pulse_phase += 0.18
+        t = (math.sin(self._pulse_phase) + 1.0) / 2.0
+        try:
+            self.status_dot.configure(fg=_blend(PALETTE["run"], "#BFDBFE", t))
+        except tk.TclError:
+            self._pulse_job = None
+            return
+        self._pulse_job = self.root.after(90, self._pulse_tick)
+
     # -- misc --------------------------------------------------------------
     def _set_status(self, text: str, kind: str = "ok") -> None:
         self.status_var.set(text)
+        self._status_kind = kind
         colors = {"ok": PALETTE["ok"], "run": PALETTE["run"],
                   "err": PALETTE["err"], "idle": PALETTE["muted"]}
-        self.status_dot.configure(fg=colors.get(kind, PALETTE["ok"]))
+        if kind == "run":
+            self._start_pulse()
+        else:
+            self._stop_pulse()
+            try:
+                self.status_dot.configure(fg=colors.get(kind, PALETTE["ok"]))
+            except tk.TclError:
+                pass
 
     def _on_close(self) -> None:
+        self._closing = True
+        self._stop_pulse()
+        for job in (self._header_job, self._fade_job):
+            if job is not None:
+                try:
+                    self.root.after_cancel(job)
+                except tk.TclError:
+                    pass
         if self._running:
             if not messagebox.askyesno("仍在运行", "任务还在运行，停止并退出？", parent=self.root):
+                self._closing = False
                 return
             self._stop()
         self._closing = True
