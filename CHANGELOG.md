@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.2.0] - 2026-11-03
+
+### Changed
+
+- The main editor uses a new pure-Python dark theme: dark cards, consistent
+  borders, styled inputs/tables/log and matching AI dialog.
+- The AI dialog input is shorter and the window is taller, so the run buttons
+  are no longer clipped.
+
 ## [1.1.6] - 2026-11-03
 
 ### Fixed

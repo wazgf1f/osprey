@@ -48,17 +48,19 @@ MISSING_LABELS = {"stop": "找不到就停止", "skip": "找不到就跳过"}
 FONT = "Microsoft YaHei UI"
 MONO = "Consolas"
 PALETTE = {
-    "bg": "#F3F6FB",
-    "card": "#FFFFFF",
-    "ink": "#14213D",
-    "muted": "#6B7A90",
-    "accent": "#2563EB",
-    "accent_dark": "#1D4ED8",
-    "ok": "#16A34A",
-    "run": "#2563EB",
-    "err": "#DC2626",
-    "header": "#0E1B33",
-    "header_sub": "#9FB0CC",
+    "bg": "#0B1220",
+    "card": "#121C2E",
+    "card_alt": "#0E1728",
+    "ink": "#E6EDF7",
+    "muted": "#8DA2BF",
+    "border": "#22314A",
+    "accent": "#3B82F6",
+    "accent_dark": "#2563EB",
+    "ok": "#22C55E",
+    "run": "#60A5FA",
+    "err": "#F87171",
+    "header": "#070D18",
+    "header_sub": "#8FA6C7",
 }
 
 
@@ -392,8 +394,8 @@ class AiDialog(tk.Toplevel):
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master)
         self.title("AI 指令（DeepSeek / 本地 Qwen-VL）")
-        self.geometry("800x760")
-        self.minsize(660, 620)
+        self.geometry("800x800")
+        self.minsize(660, 680)
         self.transient(master)
         self.result = None
         self._closed = False
@@ -402,7 +404,13 @@ class AiDialog(tk.Toplevel):
         frame.pack(fill="both", expand=True)
 
         ttk.Label(frame, text="给 AI 的指令").pack(anchor="w")
-        self.text = tk.Text(frame, height=6, width=60, wrap="word", font=(FONT, 10))
+        self.text = tk.Text(
+            frame, height=5, width=60, wrap="word", font=(FONT, 10),
+            bg=PALETTE["card_alt"], fg=PALETTE["ink"],
+            insertbackground=PALETTE["ink"], relief="flat", bd=0,
+            padx=10, pady=8, highlightthickness=1,
+            highlightbackground=PALETTE["border"], highlightcolor=PALETTE["accent"],
+        )
         self.text.pack(fill="both", expand=True, pady=(6, 10))
         self.text.insert("1.0", "打开 Windows 设置并点击“系统”")
         self.text.focus_set()
@@ -604,25 +612,64 @@ class PlanEditor:
     # -- layout ------------------------------------------------------------
     def _apply_theme(self) -> None:
         style = ttk.Style(self.root)
-        for theme in ("vista", "clam"):
-            if theme in style.theme_names():
-                style.theme_use(theme)
-                break
-        style.configure(".", font=(FONT, 10), background=PALETTE["bg"], foreground=PALETTE["ink"])
-        style.configure("TButton", padding=(9, 5))
-        style.configure("Tool.TButton", padding=(10, 6))
-        style.configure("TLabelframe", background=PALETTE["bg"], borderwidth=0)
-        style.configure("TLabelframe.Label", background=PALETTE["bg"],
-                        foreground=PALETTE["muted"], font=(FONT, 10, "bold"))
-        style.configure("Steps.Treeview", rowheight=30, font=(FONT, 10),
-                        background=PALETTE["card"], fieldbackground=PALETTE["card"], borderwidth=0)
-        style.configure("Treeview.Heading", font=(FONT, 10, "bold"),
-                        foreground=PALETTE["muted"], background=PALETTE["bg"])
+        if "clam" in style.theme_names():
+            style.theme_use("clam")
+        bg = PALETTE["bg"]
+        card = PALETTE["card"]
+        ink = PALETTE["ink"]
+        muted = PALETTE["muted"]
+        border = PALETTE["border"]
+        accent = PALETTE["accent"]
+        style.configure(".", font=(FONT, 10), background=bg, foreground=ink,
+                        fieldbackground=card, bordercolor=border,
+                        lightcolor=border, darkcolor=border,
+                        troughcolor=PALETTE["card_alt"], focuscolor=accent)
+        style.configure("TFrame", background=bg)
+        style.configure("Card.TFrame", background=card)
+        style.configure("TLabel", background=bg, foreground=ink)
+        style.configure("Muted.TLabel", background=bg, foreground=muted)
+        style.configure("TButton", background=card, foreground=ink,
+                        bordercolor=border, padding=(11, 6), relief="flat")
+        style.map("TButton",
+                  background=[("active", "#1B2A42"), ("pressed", "#223451"),
+                              ("disabled", PALETTE["card_alt"])],
+                  foreground=[("disabled", muted)])
+        style.configure("Tool.TButton", padding=(11, 6))
+        style.configure("Accent.TButton", background=accent, foreground="#FFFFFF",
+                        bordercolor=accent, padding=(13, 6))
+        style.map("Accent.TButton",
+                  background=[("active", PALETTE["accent_dark"]),
+                              ("pressed", PALETTE["accent_dark"])],
+                  foreground=[("disabled", "#9FB0CC")])
+        style.configure("TLabelframe", background=bg, bordercolor=border,
+                        borderwidth=1, relief="solid", padding=8)
+        style.configure("TLabelframe.Label", background=bg, foreground=muted,
+                        font=(FONT, 10, "bold"))
+        style.configure("Steps.Treeview", rowheight=31, font=(FONT, 10),
+                        background=card, fieldbackground=card, foreground=ink,
+                        borderwidth=0, relief="flat")
+        style.configure("Treeview.Heading", font=(FONT, 9, "bold"),
+                        foreground=muted, background=bg, bordercolor=border,
+                        relief="flat", padding=(6, 6))
+        style.map("Treeview.Heading", background=[("active", "#16243A")])
         style.map("Steps.Treeview",
-                  background=[("selected", "#DBEAFE")],
-                  foreground=[("selected", PALETTE["ink"])])
-        style.configure("TEntry", padding=3)
-        style.configure("TCombobox", padding=3)
+                  background=[("selected", "#1D3A63")],
+                  foreground=[("selected", "#FFFFFF")])
+        style.configure("TEntry", padding=5, fieldbackground=PALETTE["card_alt"],
+                        foreground=ink, insertcolor=ink, bordercolor=border)
+        style.configure("TCombobox", padding=5, fieldbackground=PALETTE["card_alt"],
+                        foreground=ink, arrowcolor=ink, bordercolor=border)
+        style.map("TCombobox", fieldbackground=[("readonly", PALETTE["card_alt"])],
+                  foreground=[("readonly", ink)])
+        style.configure("TRadiobutton", background=bg, foreground=ink,
+                        indicatorcolor=card, focuscolor=accent)
+        style.map("TRadiobutton", background=[("active", bg)])
+        style.configure("TCheckbutton", background=bg, foreground=ink)
+        style.configure("TScrollbar", background=PALETTE["card_alt"],
+                        troughcolor=bg, arrowcolor=muted, bordercolor=bg)
+        self.root.option_add("*TCombobox*Listbox.background", card)
+        self.root.option_add("*TCombobox*Listbox.foreground", ink)
+        self.root.option_add("*TCombobox*Listbox.selectBackground", accent)
 
     def _build(self) -> None:
         self.root.columnconfigure(0, weight=1)
@@ -735,7 +782,7 @@ class PlanEditor:
         self.tree.bind("<Double-1>", lambda _event: self._edit_selected())
         self.tree.bind("<Delete>", lambda _event: self._delete_selected())
         self.tree.bind("<Control-d>", lambda _event: self._duplicate_selected())
-        self.tree.tag_configure("odd", background="#F7F9FC")
+        self.tree.tag_configure("odd", background="#0F1A2B")
         self.tree.tag_configure("even", background=PALETTE["card"])
 
         self.empty_hint = tk.Label(
@@ -778,7 +825,7 @@ class PlanEditor:
         log_frame.rowconfigure(0, weight=1)
         self.log_text = tk.Text(
             log_frame, height=6, wrap="word", state="disabled",
-            bg="#0B1220", fg="#CBD5E1", insertbackground="#CBD5E1",
+            bg=PALETTE["card_alt"], fg="#CBD5E1", insertbackground="#CBD5E1",
             relief="flat", bd=0, padx=8, pady=6, font=(MONO, 9),
         )
         self.log_text.grid(row=0, column=0, sticky="nsew")
