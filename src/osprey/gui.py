@@ -594,7 +594,7 @@ class PlanEditor:
     def __init__(self, plan_path: Optional[str] = None) -> None:
         enable_dpi_awareness()
         self.root = tk.Tk()
-        self.root.title("Osprey 计划编辑器")
+        self.root.title(EDITOR_TITLE)
         screen_w = self.root.winfo_screenwidth()
         screen_h = self.root.winfo_screenheight()
         width, height = _window_geometry(screen_w, screen_h)
@@ -1518,13 +1518,93 @@ def _detach_console() -> None:
         pass
 
 
+EDITOR_TITLE = "Osprey 计划编辑器"
+_INSTANCE_MUTEX = "Local\\Osprey.Editor.Instance"
+
+
+def _acquire_instance():
+    """Return (mutex_handle, already_running)."""
+    if sys.platform != "win32":
+        return None, False
+    try:
+        kernel32 = ctypes.windll.kernel32
+        kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_wchar_p]
+        kernel32.CreateMutexW.restype = ctypes.c_void_p
+        kernel32.GetLastError.restype = ctypes.c_ulong
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        handle = kernel32.CreateMutexW(None, 0, _INSTANCE_MUTEX)
+        if not handle:
+            return None, False
+        return handle, kernel32.GetLastError() == 183  # ERROR_ALREADY_EXISTS
+    except Exception:
+        return None, False
+
+
+def _bring_existing_editor(timeout: float = 4.0) -> bool:
+    """Restore and foreground the existing editor window."""
+    if sys.platform != "win32":
+        return False
+    user32 = ctypes.windll.user32
+    user32.FindWindowW.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p]
+    user32.FindWindowW.restype = ctypes.c_void_p
+    user32.ShowWindow.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    user32.SetForegroundWindow.argtypes = [ctypes.c_void_p]
+    user32.BringWindowToTop.argtypes = [ctypes.c_void_p]
+    user32.IsIconic.argtypes = [ctypes.c_void_p]
+    deadline = time.monotonic() + timeout
+    while True:
+        handle = user32.FindWindowW(None, EDITOR_TITLE)
+        if handle:
+            try:
+                if user32.IsIconic(handle):
+                    user32.ShowWindow(handle, 9)  # SW_RESTORE
+                else:
+                    user32.ShowWindow(handle, 5)  # SW_SHOW
+                user32.BringWindowToTop(handle)
+                user32.SetForegroundWindow(handle)
+            except Exception:
+                pass
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.15)
+
+
 def run_gui(plan_path: Optional[str] = None) -> int:
     enable_dpi_awareness()
     _detach_console()
-    editor = PlanEditor(plan_path)
-    editor.root.lift()
-    editor.root.attributes("-topmost", True)
-    editor.root.after(600, lambda: editor.root.attributes("-topmost", False))
-    editor.root.focus_force()
-    editor.root.mainloop()
-    return 0
+    mutex, already_running = _acquire_instance()
+    if already_running:
+        if _bring_existing_editor():
+            if mutex:
+                try:
+                    ctypes.windll.kernel32.CloseHandle(mutex)
+                except Exception:
+                    pass
+            return 0
+        if mutex:
+            try:
+                ctypes.windll.kernel32.CloseHandle(mutex)
+            except Exception:
+                pass
+        try:
+            ctypes.windll.user32.MessageBoxW(
+                None, "Osprey 已在运行，但暂时找不到编辑器窗口。",
+                "Osprey", 0x40)
+        except Exception:
+            pass
+        return 0
+    try:
+        editor = PlanEditor(plan_path)
+        editor.root.lift()
+        editor.root.attributes("-topmost", True)
+        editor.root.after(600, lambda: editor.root.attributes("-topmost", False))
+        editor.root.focus_force()
+        editor.root.mainloop()
+        return 0
+    finally:
+        if mutex:
+            try:
+                ctypes.windll.kernel32.CloseHandle(mutex)
+            except Exception:
+                pass

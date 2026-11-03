@@ -22,8 +22,8 @@ Result: dist\osprey (about 67 MB, includes Python, NumPy and Pillow).
 
 Outputs:
 
-- dist\Osprey-1.2.2-Setup.exe - self-extracting installer
-- dist\Osprey-1.2.2-win64-portable.zip - same payload, no installation
+- dist\Osprey-1.2.3-Setup.exe - self-extracting installer
+- dist\Osprey-1.2.3-win64-portable.zip - same payload, no installation
 
 The installer is a WinForms application (packaging/setup_ui.cs) compiled with
 the .NET Framework csc that ships with Windows. The payload zip is appended to

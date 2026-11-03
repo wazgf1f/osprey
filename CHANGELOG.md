@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.2.3] - 2026-11-03
+
+### Added
+
+- Single-instance editor: a named mutex detects an existing process, and the
+  second launch restores and foregrounds the existing window instead of opening
+  another one.
+
 ## [1.2.2] - 2026-11-03
 
 ### Fixed
