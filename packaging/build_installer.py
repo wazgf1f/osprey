@@ -148,7 +148,7 @@ SHORTCUTS_PS1 = r"""param([string]$Dest = "")
 
 if (-not $Dest) { $Dest = $PSScriptRoot }
 
-$target = Join-Path $Dest "osprey.bat"
+$target = Join-Path $Dest "osprey.exe"
 $icon = Join-Path $Dest "osprey.exe"
 
 try {
@@ -159,6 +159,7 @@ try {
         try {
             $link = $shell.CreateShortcut((Join-Path $dir "Osprey.lnk"))
             $link.TargetPath = $target
+            $link.Arguments = "gui"
             $link.WorkingDirectory = $Dest
             $link.IconLocation = $icon + ",0"
             $link.Description = "Osprey screen automation"

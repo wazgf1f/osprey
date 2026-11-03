@@ -319,7 +319,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version="osprey " + __version__)
     parser.add_argument("-v", "--verbose", action="count", default=0, help="more logging")
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command", required=False)
 
     p_grab = sub.add_parser("grab", help="save a screenshot")
     p_grab.add_argument("output")
@@ -379,6 +379,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if not getattr(args, "command", None):
+        # Double-clicking osprey.exe should open the editor, not print usage.
+        args.func = cmd_gui
+        args.plan = None
 
     level = logging.WARNING
     if args.verbose == 1:

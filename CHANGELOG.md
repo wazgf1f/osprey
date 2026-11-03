@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.2.2] - 2026-11-03
+
+### Fixed
+
+- Running osprey.exe without a subcommand now opens the GUI instead of failing
+  with "arguments are required: command". New shortcuts target "osprey.exe gui"
+  directly instead of the batch menu.
+
 ## [1.2.1] - 2026-11-03
 
 ### Added
