@@ -1270,7 +1270,8 @@ class PlanEditor:
             except QwenVisionError as exc:
                 messagebox.showerror("本地模型不可用", str(exc), parent=self.root)
                 return
-            task = VisionAgentTask(vision=QwenVisionClient(model=model))
+            task = VisionAgentTask(
+                vision=QwenVisionClient(model=model, profile=tier))
             label = ("本地 Qwen-VL %s 运行中…" % MODEL_LABELS[tier]
                      + ("（试运行）" if not result["live"] else ""))
         self._start_task(

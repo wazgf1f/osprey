@@ -37,11 +37,25 @@ MODEL_SIZES = {
     "3b": "约 3 GB",
     "7b": "约 6 GB",
 }
+LOCAL_PROFILES = {
+    "3b": {"num_ctx": 16384, "num_batch": 128, "max_width": 1600, "max_items": 80},
+    # 8 GB cards: smaller image, fewer OCR boxes and a shorter KV cache.
+    "7b": {"num_ctx": 8192, "num_batch": 64, "max_width": 1024, "max_items": 50},
+}
 OLLAMA_URL = "http://127.0.0.1:11434"
 
 
 class QwenVisionError(OspreyError):
     """Local Qwen-VL/Ollama is unavailable or returned an invalid reply."""
+
+
+def _server_env():
+    env = os.environ.copy()
+    env.setdefault("OLLAMA_FLASH_ATTENTION", "1")
+    env.setdefault("OLLAMA_KV_CACHE_TYPE", "q8_0")
+    env.setdefault("OLLAMA_NUM_PARALLEL", "1")
+    env.setdefault("OLLAMA_MAX_LOADED_MODELS", "1")
+    return env
 
 
 def _startupinfo():
@@ -95,6 +109,7 @@ class OllamaManager:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 startupinfo=_startupinfo(),
+                env=_server_env(),
             )
         except OSError as exc:
             raise QwenVisionError("could not start Ollama: %s" % exc) from exc
@@ -190,19 +205,22 @@ class OllamaManager:
 class QwenVisionClient:
     """Native Ollama vision chat (/api/chat), so image handling is deterministic."""
 
-    def __init__(self, *, model: str = LOCAL_MODELS["3b"],
+    def __init__(self, *, model: str = LOCAL_MODELS["3b"], profile: str = "3b",
                  base_url: str = OLLAMA_URL,
                  timeout: float = 120.0,
                  manager: Optional[OllamaManager] = None) -> None:
         self.model = model
+        self.profile = profile if profile in LOCAL_PROFILES else "3b"
+        settings = LOCAL_PROFILES[self.profile]
         self.base_url = base_url.rstrip("/")
         if self.base_url.endswith("/v1"):
             self.base_url = self.base_url[:-3]
         self.timeout = float(timeout)
-        try:
-            self.num_ctx = int(os.environ.get("OSPREY_QWEN_NUM_CTX", "16384"))
-        except ValueError:
-            self.num_ctx = 16384
+        self.max_width = int(settings["max_width"])
+        self.max_items = int(settings["max_items"])
+        self.num_batch = int(settings["num_batch"])
+        self.num_ctx = int(os.environ.get(
+            "OSPREY_QWEN_NUM_CTX", str(settings["num_ctx"])))
         self.manager = manager or OllamaManager(self.base_url)
 
     def ensure_ready(self, should_abort=None) -> None:
@@ -224,8 +242,8 @@ class QwenVisionClient:
             ],
             "stream": False,
             "options": {"temperature": 0, "num_ctx": self.num_ctx,
-                        "num_predict": 80, "repeat_penalty": 1.2,
-                        "repeat_last_n": 128},
+                        "num_batch": self.num_batch, "num_predict": 80,
+                        "repeat_penalty": 1.2, "repeat_last_n": 128},
         }
         request = urllib.request.Request(
             self.base_url + "/api/chat",

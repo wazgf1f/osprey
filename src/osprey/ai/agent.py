@@ -211,7 +211,8 @@ class VisionAgentTask(OcrAgentTask):
         if self._ocr is None:
             # Local VLMs have a limited context; send fewer OCR elements.
             self.ocr = functools.partial(
-                ocr_frame, detail=True, max_items=80)
+                ocr_frame, detail=True,
+                max_items=getattr(self.vision, "max_items", 80))
         prepare = getattr(self.vision, "ensure_ready", None)
         if prepare is not None:
             ctx.logger.info("Preparing local Qwen-VL model %s",
@@ -237,7 +238,8 @@ class VisionAgentTask(OcrAgentTask):
             "elements": elements,
             "history": self.history[-8:],
         }
-        image = annotate_frame(ctx.frame, items)
+        max_width = getattr(self.vision, "max_width", 1600)
+        image = annotate_frame(ctx.frame, items, max_width=max_width)
         try:
             reply = self.vision.complete_json(
                 VISION_SYSTEM_PROMPT, json.dumps(payload, ensure_ascii=False), image)
@@ -265,7 +267,7 @@ class VisionAgentTask(OcrAgentTask):
                 coordinate = [reply.get("x"), reply.get("y")]
             if isinstance(coordinate, (list, tuple)) and len(coordinate) >= 2:
                 try:
-                    scale = min(1.0, 1600.0 / max(1, ctx.frame.width))
+                    scale = min(1.0, float(max_width) / max(1, ctx.frame.width))
                     px = float(coordinate[0]) / scale
                     py = float(coordinate[1]) / scale
                     nearest = min(

@@ -16,6 +16,8 @@ Keep a Changelog, and the project uses semantic versioning.
 - Local Qwen-VL uses a one-line action protocol; if the model emits an invalid
   line, Osprey falls back to matching the goal against OCR text instead of
   logging an error every tick.
+- The 7B profile is tuned for 8 GB cards: num_ctx=8192, 1024px image, 50 OCR
+  elements, num_batch=64, and Ollama starts with FlashAttention + q8 KV cache.
 - Per-run UTF-8 logs under %LOCALAPPDATA%\Osprey\logs, plus osprey logs.
 
 ## [1.2.2] - 2026-11-03

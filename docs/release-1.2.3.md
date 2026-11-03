@@ -25,6 +25,18 @@
   最终仍映射到 OCR 元素点击
 - 模型改用单行协议 CLICK / WAIT / SCROLL / DONE；如果 3B 仍输出无效内容，
   Osprey 会用 OCR 文本匹配做兜底，不再每帧报错空转
+
+### 7B 的 8G 显存优化
+
+7B 现在自动使用低显存档：
+
+- num_ctx 从 16384 降到 8192
+- 截图宽度从 1600 降到 1024
+- OCR 元素从 80 降到 50
+- num_batch 64，降低峰值显存
+- 启动 Ollama 时默认开启 FlashAttention、q8 KV cache、单并发
+
+如果 Ollama 已经由桌面程序常驻，需要重启 Ollama 才能应用新的环境变量。
 - 已用真实 qwen2.5vl:3b 跑通 dry-run：0 错误，并产生动作
 
 ## 日志

@@ -78,6 +78,15 @@ class TestNoImplicitDownload(unittest.TestCase):
             client.ensure_ready()
 
 
+class TestProfiles(unittest.TestCase):
+    def test_7b_uses_low_vram_profile(self) -> None:
+        client = QwenVisionClient(model=LOCAL_MODELS["7b"], profile="7b")
+        self.assertEqual(client.max_width, 1024)
+        self.assertEqual(client.max_items, 50)
+        self.assertEqual(client.num_ctx, 8192)
+        self.assertEqual(client.num_batch, 64)
+
+
 class TestActionText(unittest.TestCase):
     def test_parses_local_model_lines(self) -> None:
         self.assertEqual(parse_action_text("CLICK 3"),

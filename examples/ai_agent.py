@@ -25,5 +25,6 @@ def create_task():
     if provider in ("qwen", "qwen-local", "qwen_vl", "local"):
         tier = os.environ.get("OSPREY_AI_MODEL", "7b").strip().lower()
         model = LOCAL_MODELS.get(tier, tier)
-        return VisionAgentTask(vision=QwenVisionClient(model=model))
+        return VisionAgentTask(
+            vision=QwenVisionClient(model=model, profile=tier))
     return OcrAgentTask()
