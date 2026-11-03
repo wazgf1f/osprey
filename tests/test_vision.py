@@ -13,7 +13,7 @@ from PIL import Image
 
 from osprey.ai.ocr import OcrItem
 from osprey.ai.vision import (LOCAL_MODELS, OllamaManager, QwenVisionClient,
-                              QwenVisionError, annotate_frame)
+                              QwenVisionError, annotate_frame, parse_action_text)
 from osprey.errors import Aborted
 from osprey.capture.base import Frame
 
@@ -76,6 +76,19 @@ class TestNoImplicitDownload(unittest.TestCase):
         client = QwenVisionClient(manager=Manager())
         with self.assertRaises(QwenVisionError):
             client.ensure_ready()
+
+
+class TestActionText(unittest.TestCase):
+    def test_parses_local_model_lines(self) -> None:
+        self.assertEqual(parse_action_text("CLICK 3"),
+                         {"action": "click", "element_id": 3})
+        self.assertEqual(parse_action_text("WAIT 1.5"),
+                         {"action": "wait", "seconds": 1.5})
+        self.assertEqual(parse_action_text("SCROLL -3"),
+                         {"action": "scroll", "amount": -3})
+        self.assertEqual(parse_action_text("DONE"), {"action": "done"})
+        self.assertEqual(parse_action_text("left_click 2"),
+                         {"action": "click", "element_id": 2})
 
 
 class TestLoopbackOllama(unittest.TestCase):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import functools
 import json
 import math
@@ -33,16 +34,16 @@ Rules:
 
 
 VISION_SYSTEM_PROMPT = """You see a Windows screenshot with red numbered OCR boxes.
-Reply with one JSON object only:
-{"action": "click", "element_id": 3}
-{"action": "wait", "seconds": 1}
-{"action": "scroll", "amount": -3}
-{"action": "done"}
+Reply with exactly one line, no JSON:
+CLICK 3
+WAIT 1
+SCROLL -3
+DONE
 Rules:
-- Always use an element_id from the list; never return coordinates.
+- Use an element id from the OCR list, never coordinates.
 - Match the user's intent, not only exact text (下一页 may be 下一节 or Next).
-- Scroll down when the target is below the fold.
-- Wait while the page is loading; done only when finished or impossible.
+- Scroll down (-3) when the target is below the fold.
+- WAIT while loading; DONE only when finished or impossible.
 """
 
 
@@ -237,8 +238,12 @@ class VisionAgentTask(OcrAgentTask):
             "history": self.history[-8:],
         }
         image = annotate_frame(ctx.frame, items)
-        reply = self.vision.complete_json(
-            VISION_SYSTEM_PROMPT, json.dumps(payload, ensure_ascii=False), image)
+        try:
+            reply = self.vision.complete_json(
+                VISION_SYSTEM_PROMPT, json.dumps(payload, ensure_ascii=False), image)
+        except Exception as exc:
+            ctx.logger.warning("Qwen-VL decision failed; OCR fallback: %s", exc)
+            return self._fallback_action(items)
         kind = str(reply.get("action", "")).strip().lower()
         if kind in ("left_click", "click"):
             reply["action"] = "click"
@@ -277,3 +282,30 @@ class VisionAgentTask(OcrAgentTask):
         if thought:
             ctx.logger.info("AI: %s", thought)
         return reply
+
+
+    def _fallback_action(self, items: List[OcrItem]) -> Dict[str, Any]:
+        goal = " ".join(self.goal.lower().split())
+        goal_chars = set(goal)
+        best_index = None
+        best_score = 0.0
+        for index, item in enumerate(items):
+            text = " ".join(item.text.lower().split())
+            if not text:
+                continue
+            ratio = difflib.SequenceMatcher(None, goal, text).ratio()
+            overlap = len(goal_chars & set(text)) / max(1, len(goal_chars))
+            score = ratio * 0.6 + overlap * 0.4
+            if len(text) > 24:
+                score *= 0.7
+            if score > best_score:
+                best_score = score
+                best_index = index
+        if best_index is not None and best_score >= 0.22:
+            return {
+                "action": "click",
+                "element_id": best_index,
+                "thought": "Qwen-VL fallback: OCR text match %.2f" % best_score,
+            }
+        return {"action": "scroll", "amount": -3,
+                "thought": "Qwen-VL fallback: no OCR match, scroll"}

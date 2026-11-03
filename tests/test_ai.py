@@ -162,6 +162,25 @@ class TestOcrAgent(unittest.TestCase):
         self.assertEqual(ctx.stats.actions, 1)
         self.assertIn("click 0", task.history[-1])
 
+    def test_vision_failure_falls_back_to_ocr_match(self) -> None:
+        class BrokenVision:
+            model = "qwen2.5vl:3b"
+
+            def ensure_ready(self, should_abort=None):
+                return None
+
+            def complete_json(self, system, user, image):
+                raise RuntimeError("repeat limit")
+
+        task = VisionAgentTask(
+            vision=BrokenVision(),
+            ocr=lambda _frame: [OcrItem("下一页", (10, 10, 20, 20))])
+        ctx = make_context(goal="点击下一页")
+        task.setup(ctx)
+        task.step(ctx)
+        self.assertEqual(ctx.stats.actions, 1)
+        self.assertIn("click 0", task.history[-1])
+
     def test_vision_task_sends_annotated_image(self) -> None:
         class FakeVision:
             model = "qwen2.5vl:3b"

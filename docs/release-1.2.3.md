@@ -23,7 +23,9 @@
 - 现在请求显式设置 num_ctx=16384，并把 OCR 元素限制在 80 个
 - 兼容 3B 的 terminate / left_click / scroll_down 别名和 coordinate 输出，
   最终仍映射到 OCR 元素点击
-- 已用真实 qwen2.5vl:3b 跑通 dry-run：1 次动作、0 错误
+- 模型改用单行协议 CLICK / WAIT / SCROLL / DONE；如果 3B 仍输出无效内容，
+  Osprey 会用 OCR 文本匹配做兜底，不再每帧报错空转
+- 已用真实 qwen2.5vl:3b 跑通 dry-run：0 错误，并产生动作
 
 ## 日志
 

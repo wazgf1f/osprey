@@ -22,7 +22,7 @@ import numpy as np
 
 from ..capture.base import Frame
 from ..errors import Aborted, OspreyError
-from .deepseek import parse_json_reply
+from .deepseek import DeepSeekError, parse_json_reply
 from .ocr import OcrItem
 
 LOCAL_MODELS = {
@@ -224,7 +224,7 @@ class QwenVisionClient:
             ],
             "stream": False,
             "options": {"temperature": 0, "num_ctx": self.num_ctx,
-                        "num_predict": 160, "repeat_penalty": 1.15,
+                        "num_predict": 80, "repeat_penalty": 1.2,
                         "repeat_last_n": 128},
         }
         request = urllib.request.Request(
@@ -246,7 +246,30 @@ class QwenVisionClient:
             content = data["message"]["content"]
         except (KeyError, TypeError) as exc:
             raise QwenVisionError("unexpected Qwen-VL response: %r" % (data,)) from exc
-        return parse_json_reply(content)
+        try:
+            return parse_json_reply(content)
+        except DeepSeekError:
+            return parse_action_text(content)
+
+
+def parse_action_text(content: str) -> Dict[str, Any]:
+    """Parse a short local-model action line (CLICK 3, WAIT 1, ...)."""
+    text = " ".join(str(content or "").strip().split())
+    if not text:
+        raise QwenVisionError("model returned an empty action")
+    upper = text.upper()
+    if upper in ("DONE", "FINISH", "TERMINATE", "COMPLETE"):
+        return {"action": "done"}
+    match = re.search(r"(?:LEFT_)?CLICK\s*[:(]?\s*(\d+)", upper)
+    if match:
+        return {"action": "click", "element_id": int(match.group(1))}
+    match = re.search(r"WAIT\s*:?\s*(\d+(?:\.\d+)?)", upper)
+    if match:
+        return {"action": "wait", "seconds": float(match.group(1))}
+    match = re.search(r"SCROLL\s*:?\s*(-?\d+)", upper)
+    if match:
+        return {"action": "scroll", "amount": int(match.group(1))}
+    raise QwenVisionError("model did not return a recognized action: %r" % content)
 
 
 def annotate_frame(frame: Frame, items: List[OcrItem], *,

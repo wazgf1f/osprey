@@ -13,6 +13,9 @@ Keep a Changelog, and the project uses semantic versioning.
 - Local Qwen-VL requests use num_ctx=16384 and fewer OCR elements, fixing the
   4096-token context error; terminate/left_click/scroll aliases and image
   coordinates are normalized back to OCR element ids.
+- Local Qwen-VL uses a one-line action protocol; if the model emits an invalid
+  line, Osprey falls back to matching the goal against OCR text instead of
+  logging an error every tick.
 - Per-run UTF-8 logs under %LOCALAPPDATA%\Osprey\logs, plus osprey logs.
 
 ## [1.2.2] - 2026-11-03
