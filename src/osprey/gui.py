@@ -387,6 +387,7 @@ class AiDialog(tk.Toplevel):
         self.mode_var = tk.StringVar(value="deepseek")
         self._prompted_models = set()
         self._checking_model = False
+        self.local_status_var = tk.StringVar(value="本地模型：未检测")
         modes = ttk.Frame(frame)
         modes.pack(fill="x", pady=(4, 2))
         ttk.Radiobutton(modes, text="DeepSeek 文本（OCR）", value="deepseek",
@@ -414,6 +415,8 @@ class AiDialog(tk.Toplevel):
         self.download_button = ttk.Button(
             download_row, text="下载所选本地模型", command=self._download_model)
         self.download_button.pack(side="left")
+        ttk.Label(frame, textvariable=self.local_status_var,
+                  foreground=PALETTE["muted"]).pack(anchor="w", pady=(0, 8))
 
         ttk.Label(frame, text="DeepSeek API Key（仅文本模式；留空读取 DEEPSEEK_API_KEY）").pack(anchor="w")
         self.key_var = tk.StringVar(value="")
@@ -469,7 +472,9 @@ class AiDialog(tk.Toplevel):
 
     def _on_mode_change(self) -> None:
         if self.mode_var.get() == "deepseek":
+            self.local_status_var.set("本地模型：未检测")
             return
+        self.local_status_var.set("正在检查本地模型…")
         self.after(50, lambda: self._check_selected_model(False))
 
     def _download_model(self) -> None:
@@ -496,21 +501,28 @@ class AiDialog(tk.Toplevel):
                 manager.start()
             if manager.has_model(model):
                 self._prompted_models.add(model)
+                self.local_status_var.set("已安装：%s" % model)
                 if force:
                     messagebox.showinfo("本地模型", "%s 已安装。" % model, parent=self)
                 return
+            self.local_status_var.set("未安装：%s（%s）" % (model, size))
             if not messagebox.askyesno(
                 "需要下载本地模型",
                 "本地模型 %s 尚未安装。\n\n文件大小：%s\n\n"
                 "下载后才能使用本地视觉模式。现在下载吗？" % (model, size),
                 parent=self,
             ):
+                self.local_status_var.set("未下载：%s" % model)
                 return
             dialog = ModelDownloadDialog(self, model=model, size=size, manager=manager)
             self.wait_window(dialog)
             if dialog.result:
                 self._prompted_models.add(model)
+                self.local_status_var.set("已安装：%s" % model)
+            else:
+                self.local_status_var.set("未下载：%s" % model)
         except QwenVisionError as exc:
+            self.local_status_var.set("Ollama 不可用")
             messagebox.showerror("本地模型不可用", str(exc), parent=self)
         finally:
             self._checking_model = False

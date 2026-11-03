@@ -10,7 +10,7 @@ whole stack can be read in an afternoon and extended without a framework.
 
 from .errors import Aborted, CaptureError, ConfigError, OspreyError, VisionError
 
-__version__ = "1.1.4"
+__version__ = "1.1.5"
 
 __all__ = [
     "Aborted",

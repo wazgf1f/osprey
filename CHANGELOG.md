@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.1.5] - 2026-11-03
+
+### Fixed
+
+- The AI dialog now shows local model status (checking / installed / missing /
+  Ollama unavailable), so selecting an already-installed 3B gives visible
+  feedback instead of appearing unresponsive.
+
 ## [1.1.4] - 2026-11-03
 
 ### Added
