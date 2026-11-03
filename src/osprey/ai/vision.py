@@ -6,14 +6,17 @@ import base64
 import io
 import json
 import os
+import queue
+import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
@@ -117,7 +120,8 @@ class OllamaManager:
         return model in self.models() if self.is_running() else False
 
     def ensure_model(self, model: str, timeout: float = 3600.0,
-                     should_abort=None) -> None:
+                     should_abort=None,
+                     progress: Optional[Callable[[int, str], None]] = None) -> None:
         if not self.is_running():
             self.start()
         names = self.models()
@@ -127,14 +131,30 @@ class OllamaManager:
         try:
             process = subprocess.Popen(
                 [exe, "pull", model],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
                 startupinfo=_startupinfo(),
             )
         except OSError as exc:
             raise QwenVisionError("could not start ollama pull: %s" % exc) from exc
+        lines: queue.Queue = queue.Queue()
+
+        def read_output():
+            try:
+                if process.stdout is not None:
+                    for line in process.stdout:
+                        lines.put(line)
+            finally:
+                lines.put(None)
+
+        threading.Thread(target=read_output, daemon=True).start()
         started = time.monotonic()
-        while process.poll() is None:
+        last_percent = 0
+        while True:
             if should_abort is not None and should_abort():
                 process.terminate()
                 try:
@@ -145,9 +165,26 @@ class OllamaManager:
             if time.monotonic() - started > timeout:
                 process.kill()
                 raise QwenVisionError("timed out pulling Ollama model %s" % model)
-            time.sleep(0.2)
+            try:
+                line = lines.get(timeout=0.2)
+            except queue.Empty:
+                if process.poll() is not None:
+                    break
+                continue
+            if line is None:
+                break
+            match = re.search(r"(\d{1,3})%", line)
+            if match is not None:
+                last_percent = min(100, int(match.group(1)))
+                if progress is not None:
+                    progress(last_percent, line.strip())
+            elif progress is not None and line.strip():
+                progress(last_percent, line.strip())
+        process.wait()
         if process.returncode != 0:
             raise QwenVisionError("could not pull %s (exit %s)" % (model, process.returncode))
+        if progress is not None:
+            progress(100, "下载完成")
 
 
 class QwenVisionClient:

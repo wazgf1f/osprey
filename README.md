@@ -14,7 +14,7 @@ Osprey is a small, readable engine and library rather than a framework you have
 to adopt wholesale. The core is plain Python on top of NumPy, Pillow and the
 Win32 API.
 
-Status: **1.1.3 alpha**, Windows 10/11, Python 3.9+.
+Status: **1.1.4 alpha**, Windows 10/11, Python 3.9+.
 
 ![The Osprey plan editor](docs/images/editor.png)
 
@@ -67,7 +67,7 @@ It is not:
 
 ### Windows installer (no Python required)
 
-Download **Osprey-1.1.3-Setup.exe** from
+Download **Osprey-1.1.4-Setup.exe** from
 [Releases](https://github.com/wazgf1f/osprey/releases).
 
 The installer shows the terms of use first: you must tick "I have read and
@@ -75,10 +75,10 @@ agree" to continue, and the install path is customisable. It installs to
 <code>%LOCALAPPDATA%\Programs\Osprey</code> and adds Desktop and Start Menu
 shortcuts.
 
-- **Upgrades:** from 1.1.3 the installer extracts to a staging directory and
+- **Upgrades:** from 1.1.4 the installer extracts to a staging directory and
   replaces the existing installation, so old files do not survive an update.
   Close Osprey before installing a new version.
-- **Uninstall:** Settings -> Apps -> **Osprey 1.1.3**, or run
+- **Uninstall:** Settings -> Apps -> **Osprey 1.1.4**, or run
   <code>uninstall.bat</code> from the install directory.
 - **SmartScreen:** the executable is unsigned, so Windows may warn about an
   unknown publisher. Choose **More info**, then **Run anyway**.
@@ -89,7 +89,7 @@ all consequences of use.
 
 ### Portable
 
-Unzip **Osprey-1.1.3-win64-portable.zip** and run <code>osprey.bat</code>.
+Unzip **Osprey-1.1.4-win64-portable.zip** and run <code>osprey.bat</code>.
 
 ### From source
 
@@ -140,7 +140,7 @@ Check the environment first:
 
     osprey doctor
 
-    osprey 1.1.3
+    osprey 1.1.4
     python      : 3.12.14
     platform    : Windows-11-10.0.26300-SP0 (AMD64)
     numpy       : 2.3.5
@@ -201,11 +201,11 @@ model see the whole desktop with numbered OCR boxes. Screenshots and the model
 stay on this machine.
 
 1. Install [Ollama](https://ollama.com/download).
-2. Models are never downloaded automatically. Click **下载所选本地模型** and
-   confirm the size first: about 3 GB for 3B and 6 GB for 7B. 7B is happier with
-   8 GB+ VRAM; CPU works but is slower.
-3. If the model is missing, running tells you to download it first instead of
-   starting a hidden download.
+2. Selecting 3B/7B checks whether the model is installed. If not, a dialog
+   shows the size (about 3 GB for 3B, 6 GB for 7B) and only downloads after you
+   confirm; a percentage progress bar is shown and can be cancelled.
+3. Models are never downloaded silently; running with a missing model only asks
+   you to download it first.
 4. OCR still supplies the click coordinates; Qwen-VL only chooses the element
    id, so the model never guesses pixels.
 

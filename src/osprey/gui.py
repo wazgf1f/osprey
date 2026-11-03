@@ -273,6 +273,96 @@ class StepDialog(tk.Toplevel):
         self.destroy()
 
 
+class ModelDownloadDialog(tk.Toplevel):
+    """Modal progress window for an explicit Ollama model download."""
+
+    def __init__(self, master: tk.Misc, *, model: str, size: str,
+                 manager: OllamaManager) -> None:
+        super().__init__(master)
+        self.title("下载本地模型")
+        self.geometry("540x230")
+        self.resizable(False, False)
+        self.transient(master)
+        self.model = model
+        self.manager = manager
+        self.result = False
+        self._cancel = threading.Event()
+        self._closed = False
+
+        frame = ttk.Frame(self, padding=16)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="正在下载 %s（%s）" % (model, size),
+                  font=(FONT, 11, "bold")).pack(anchor="w")
+        self.status_var = tk.StringVar(value="准备下载…")
+        ttk.Label(frame, textvariable=self.status_var).pack(anchor="w", pady=(10, 6))
+        self.progress = tk.IntVar(value=0)
+        self.bar = ttk.Progressbar(frame, maximum=100, variable=self.progress)
+        self.bar.pack(fill="x")
+        self.cancel_button = ttk.Button(frame, text="取消下载", command=self._close)
+        self.cancel_button.pack(anchor="e", pady=(14, 0))
+
+        self.protocol("WM_DELETE_WINDOW", self._close)
+        self.update_idletasks()
+        self.wait_visibility()
+        self.grab_set()
+        self.after(150, self._start)
+
+    def _start(self) -> None:
+        def worker():
+            try:
+                self.manager.ensure_model(
+                    self.model,
+                    progress=self._progress,
+                    should_abort=self._cancel.is_set,
+                )
+            except Aborted:
+                self._finish(None, cancelled=True)
+            except Exception as exc:
+                self._finish(exc)
+            else:
+                self._finish(None)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _progress(self, percent: int, message: str) -> None:
+        try:
+            self.after(0, lambda: self._set_progress(percent, message))
+        except tk.TclError:
+            pass
+
+    def _set_progress(self, percent: int, message: str) -> None:
+        if self._closed:
+            return
+        self.progress.set(max(0, min(100, percent)))
+        if message and len(message) < 160:
+            self.status_var.set(message)
+
+    def _finish(self, exc: Optional[Exception], cancelled: bool = False) -> None:
+        try:
+            self.after(0, lambda: self._show_finish(exc, cancelled))
+        except tk.TclError:
+            pass
+
+    def _show_finish(self, exc: Optional[Exception], cancelled: bool) -> None:
+        if self._closed:
+            return
+        if cancelled:
+            self.status_var.set("下载已取消")
+        elif exc is not None:
+            self.status_var.set("下载失败")
+            messagebox.showerror("下载失败", str(exc), parent=self)
+        else:
+            self.status_var.set("下载完成")
+            self.progress.set(100)
+            self.result = True
+        self.cancel_button.configure(text="关闭", command=self._close)
+
+    def _close(self) -> None:
+        self._cancel.set()
+        self._closed = True
+        self.destroy()
+
+
 class AiDialog(tk.Toplevel):
     """Text goal plus DeepSeek text or local Qwen-VL selection."""
 
@@ -295,7 +385,8 @@ class AiDialog(tk.Toplevel):
 
         ttk.Label(frame, text="决策模型").pack(anchor="w")
         self.mode_var = tk.StringVar(value="deepseek")
-        self._download_cancel = threading.Event()
+        self._prompted_models = set()
+        self._checking_model = False
         modes = ttk.Frame(frame)
         modes.pack(fill="x", pady=(4, 2))
         ttk.Radiobutton(modes, text="DeepSeek 文本（OCR）", value="deepseek",
@@ -306,9 +397,10 @@ class AiDialog(tk.Toplevel):
         local_modes = ttk.Frame(frame)
         local_modes.pack(fill="x", pady=(0, 8))
         ttk.Radiobutton(local_modes, text="本地 Qwen-VL 3B（能用）", value="qwen3b",
-                        variable=self.mode_var).pack(side="left")
+                        variable=self.mode_var, command=self._on_mode_change).pack(side="left")
         ttk.Radiobutton(local_modes, text="本地 Qwen-VL 7B（精准）", value="qwen7b",
-                        variable=self.mode_var).pack(side="left", padx=(14, 0))
+                        variable=self.mode_var, command=self._on_mode_change).pack(
+            side="left", padx=(14, 0))
 
         ttk.Label(
             frame,
@@ -322,9 +414,6 @@ class AiDialog(tk.Toplevel):
         self.download_button = ttk.Button(
             download_row, text="下载所选本地模型", command=self._download_model)
         self.download_button.pack(side="left")
-        self.cancel_download_button = ttk.Button(
-            download_row, text="取消下载", command=self._cancel_download, state="disabled")
-        self.cancel_download_button.pack(side="left", padx=(8, 0))
 
         ttk.Label(frame, text="DeepSeek API Key（仅文本模式；留空读取 DEEPSEEK_API_KEY）").pack(anchor="w")
         self.key_var = tk.StringVar(value="")
@@ -378,60 +467,55 @@ class AiDialog(tk.Toplevel):
         }
         self.destroy()
 
+    def _on_mode_change(self) -> None:
+        if self.mode_var.get() == "deepseek":
+            return
+        self.after(50, lambda: self._check_selected_model(False))
+
     def _download_model(self) -> None:
+        self._check_selected_model(True)
+
+    def _check_selected_model(self, force: bool) -> None:
         mode = self.mode_var.get()
         if mode == "deepseek":
-            messagebox.showinfo("本地模型", "当前是 DeepSeek 文本模式，不需要下载本地模型。",
-                                parent=self)
+            if force:
+                messagebox.showinfo("本地模型", "当前是 DeepSeek 文本模式，不需要下载本地模型。",
+                                    parent=self)
+            return
+        if self._checking_model:
             return
         tier = "7b" if mode == "qwen7b" else "3b"
         model = LOCAL_MODELS[tier]
         size = MODEL_SIZES[tier]
-        if not messagebox.askyesno(
-            "下载本地模型",
-            "将下载 %s 到本机，大小 %s。\n\n下载会调用 ollama pull，"
-            "首次可能较慢；下载期间可以关闭窗口，但模型下载可能继续。\n\n继续吗？"
-            % (model, size),
-            parent=self,
-        ):
+        if not force and model in self._prompted_models:
             return
-        self._download_cancel.clear()
-        self.download_button.configure(state="disabled", text="下载中…")
-        self.cancel_download_button.configure(state="normal")
-
-        def worker():
-            try:
-                OllamaManager().ensure_model(
-                    model, should_abort=self._download_cancel.is_set)
-            except Exception as exc:
-                self.after(0, lambda: self._download_finished(exc))
-            else:
-                self.after(0, lambda: self._download_finished(None))
-
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _cancel_download(self) -> None:
-        self._download_cancel.set()
+        self._checking_model = True
         try:
-            self.cancel_download_button.configure(state="disabled")
-        except tk.TclError:
-            pass
-
-    def _download_finished(self, exc: Optional[Exception]) -> None:
-        try:
-            self.download_button.configure(state="normal", text="下载所选本地模型")
-            self.cancel_download_button.configure(state="disabled")
-        except tk.TclError:
-            return
-        if isinstance(exc, Aborted):
-            messagebox.showinfo("已取消", "模型下载已取消。", parent=self)
-        elif exc is not None:
-            messagebox.showerror("下载失败", str(exc), parent=self)
-        else:
-            messagebox.showinfo("下载完成", "本地模型已就绪，可以开始运行。", parent=self)
+            manager = OllamaManager()
+            if not manager.is_running():
+                manager.start()
+            if manager.has_model(model):
+                self._prompted_models.add(model)
+                if force:
+                    messagebox.showinfo("本地模型", "%s 已安装。" % model, parent=self)
+                return
+            if not messagebox.askyesno(
+                "需要下载本地模型",
+                "本地模型 %s 尚未安装。\n\n文件大小：%s\n\n"
+                "下载后才能使用本地视觉模式。现在下载吗？" % (model, size),
+                parent=self,
+            ):
+                return
+            dialog = ModelDownloadDialog(self, model=model, size=size, manager=manager)
+            self.wait_window(dialog)
+            if dialog.result:
+                self._prompted_models.add(model)
+        except QwenVisionError as exc:
+            messagebox.showerror("本地模型不可用", str(exc), parent=self)
+        finally:
+            self._checking_model = False
 
     def _cancel(self) -> None:
-        self._download_cancel.set()
         self.result = None
         self.destroy()
 

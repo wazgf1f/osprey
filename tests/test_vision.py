@@ -126,6 +126,7 @@ class TestOllamaManager(unittest.TestCase):
         manager.models = lambda: ["qwen2.5vl:7b"]
         manager.executable = lambda: "ollama"
         process = mock.Mock(returncode=0)
+        process.stdout = None
         process.poll.return_value = 0
         with mock.patch("osprey.ai.vision.subprocess.Popen", return_value=process) as run:
             manager.ensure_model("qwen2.5vl:3b")
@@ -138,6 +139,7 @@ class TestOllamaManager(unittest.TestCase):
         manager.models = lambda: []
         manager.executable = lambda: "ollama"
         process = mock.Mock(returncode=1)
+        process.stdout = None
         process.poll.return_value = None
         with mock.patch("osprey.ai.vision.subprocess.Popen", return_value=process):
             with self.assertRaises(Aborted):

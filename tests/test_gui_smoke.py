@@ -280,8 +280,9 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
-    def test_ai_dialog_can_cancel_model_download(self) -> None:
+    def test_local_model_selection_prompts_with_size(self) -> None:
         import tkinter as tk
+        from unittest import mock
 
         from osprey.gui import AiDialog, PlanEditor
 
@@ -290,11 +291,21 @@ class TestGuiSmoke(unittest.TestCase):
         except tk.TclError as exc:  # pragma: no cover - headless session
             self.skipTest("no display available: %s" % exc)
 
+        class FakeManager:
+            def is_running(self):
+                return True
+
+            def has_model(self, model):
+                return False
+
         try:
             dialog = AiDialog(editor.root)
-            self.assertFalse(dialog._download_cancel.is_set())
-            dialog._cancel_download()
-            self.assertTrue(dialog._download_cancel.is_set())
+            dialog.mode_var.set("qwen7b")
+            with mock.patch("osprey.gui.OllamaManager", return_value=FakeManager()):
+                with mock.patch("osprey.gui.messagebox.askyesno", return_value=False) as ask:
+                    dialog._check_selected_model(True)
+            self.assertTrue(ask.called)
+            self.assertIn("约 6 GB", ask.call_args.args[1])
         finally:
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()

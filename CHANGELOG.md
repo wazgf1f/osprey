@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.1.4] - 2026-11-03
+
+### Added
+
+- Selecting a local model now checks availability and immediately offers a
+  download with its 3B (~3 GB) or 7B (~6 GB) size. Confirming opens a percentage
+  progress window with a cancel button; missing models are never downloaded
+  silently.
+
 ## [1.1.3] - 2026-11-02
 
 ### Fixed
