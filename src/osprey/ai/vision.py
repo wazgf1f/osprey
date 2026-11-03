@@ -199,6 +199,10 @@ class QwenVisionClient:
         if self.base_url.endswith("/v1"):
             self.base_url = self.base_url[:-3]
         self.timeout = float(timeout)
+        try:
+            self.num_ctx = int(os.environ.get("OSPREY_QWEN_NUM_CTX", "16384"))
+        except ValueError:
+            self.num_ctx = 16384
         self.manager = manager or OllamaManager(self.base_url)
 
     def ensure_ready(self, should_abort=None) -> None:
@@ -219,8 +223,9 @@ class QwenVisionClient:
                 {"role": "user", "content": user, "images": [encoded]},
             ],
             "stream": False,
-            "format": "json",
-            "options": {"temperature": 0},
+            "options": {"temperature": 0, "num_ctx": self.num_ctx,
+                        "num_predict": 160, "repeat_penalty": 1.15,
+                        "repeat_last_n": 128},
         }
         request = urllib.request.Request(
             self.base_url + "/api/chat",

@@ -143,6 +143,25 @@ class TestOcrAgent(unittest.TestCase):
         task.step(ctx)
         self.assertTrue(any(entry.startswith("scroll") for entry in ctx.input.history))
 
+    def test_vision_aliases_and_coordinates_are_normalized(self) -> None:
+        class FakeVision:
+            model = "qwen2.5vl:3b"
+
+            def ensure_ready(self, should_abort=None):
+                return None
+
+            def complete_json(self, system, user, image):
+                return {"action": "left_click", "coordinate": [20, 20]}
+
+        task = VisionAgentTask(
+            vision=FakeVision(),
+            ocr=lambda _frame: [OcrItem("OK", (10, 10, 20, 20))])
+        ctx = make_context()
+        task.setup(ctx)
+        task.step(ctx)
+        self.assertEqual(ctx.stats.actions, 1)
+        self.assertIn("click 0", task.history[-1])
+
     def test_vision_task_sends_annotated_image(self) -> None:
         class FakeVision:
             model = "qwen2.5vl:3b"

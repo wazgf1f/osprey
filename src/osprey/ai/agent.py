@@ -32,21 +32,17 @@ Rules:
 """
 
 
-VISION_SYSTEM_PROMPT = """You control a Windows desktop and can see a screenshot.
-The screenshot has red OCR boxes, each labelled with an element id.
-Choose exactly one action and reply with JSON only:
-{"thought": "...", "action": "click", "element_id": 3}
-{"thought": "...", "action": "wait", "seconds": 1}
-{"thought": "...", "action": "scroll", "amount": -3}
-{"thought": "...", "action": "done"}
+VISION_SYSTEM_PROMPT = """You see a Windows screenshot with red numbered OCR boxes.
+Reply with one JSON object only:
+{"action": "click", "element_id": 3}
+{"action": "wait", "seconds": 1}
+{"action": "scroll", "amount": -3}
+{"action": "done"}
 Rules:
-- Use the screenshot, the OCR text list and the user's language goal together.
-- click only an element_id that exists in the list; never invent coordinates.
-- Prefer the control that best matches the user's intent, even if the wording
-  differs (for example 下一页 may appear as 下一节, Next or >).
-- If the target is below the fold, use scroll (negative scrolls down).
-- Use wait when the screen is still loading.
-- Use done only when the goal is satisfied or clearly impossible.
+- Always use an element_id from the list; never return coordinates.
+- Match the user's intent, not only exact text (下一页 may be 下一节 or Next).
+- Scroll down when the target is below the fold.
+- Wait while the page is loading; done only when finished or impossible.
 """
 
 
@@ -157,7 +153,10 @@ class OcrAgentTask(Task):
                 ctx.sleep(self.tick_wait)
                 return
             item = items[element_id]
-            ctx.click(item.center)
+            button = action.get("button", "left")
+            if button not in ("left", "right", "middle"):
+                button = "left"
+            ctx.click(item.center, button=button)
             self.history.append("click %d %r" % (element_id, item.text))
             ctx.sleep(self.tick_wait)
             return
@@ -208,6 +207,10 @@ class VisionAgentTask(OcrAgentTask):
 
     def setup(self, ctx: Context) -> None:
         super().setup(ctx)
+        if self._ocr is None:
+            # Local VLMs have a limited context; send fewer OCR elements.
+            self.ocr = functools.partial(
+                ocr_frame, detail=True, max_items=80)
         prepare = getattr(self.vision, "ensure_ready", None)
         if prepare is not None:
             ctx.logger.info("Preparing local Qwen-VL model %s",
@@ -236,6 +239,40 @@ class VisionAgentTask(OcrAgentTask):
         image = annotate_frame(ctx.frame, items)
         reply = self.vision.complete_json(
             VISION_SYSTEM_PROMPT, json.dumps(payload, ensure_ascii=False), image)
+        kind = str(reply.get("action", "")).strip().lower()
+        if kind in ("left_click", "click"):
+            reply["action"] = "click"
+            reply.setdefault("button", "left")
+        elif kind == "right_click":
+            reply["action"] = "click"
+            reply["button"] = "right"
+        elif kind in ("terminate", "finish", "complete", "stop"):
+            reply["action"] = "done"
+        elif kind in ("scroll_down", "scrolldown", "scroll down"):
+            reply["action"] = "scroll"
+            reply.setdefault("amount", -3)
+        elif kind in ("scroll_up", "scrollup", "scroll up"):
+            reply["action"] = "scroll"
+            reply.setdefault("amount", 3)
+        if reply.get("action") == "click" and "element_id" not in reply:
+            coordinate = reply.get("coordinate") or reply.get("point")
+            if coordinate is None and "x" in reply and "y" in reply:
+                coordinate = [reply.get("x"), reply.get("y")]
+            if isinstance(coordinate, (list, tuple)) and len(coordinate) >= 2:
+                try:
+                    scale = min(1.0, 1600.0 / max(1, ctx.frame.width))
+                    px = float(coordinate[0]) / scale
+                    py = float(coordinate[1]) / scale
+                    nearest = min(
+                        range(len(items)),
+                        key=lambda index: (items[index].center[0] - px) ** 2
+                        + (items[index].center[1] - py) ** 2,
+                    )
+                    reply["element_id"] = nearest
+                    reply["thought"] = (str(reply.get("thought", "")) +
+                                        " (coordinate mapped to OCR box)").strip()
+                except (TypeError, ValueError):
+                    pass
         thought = str(reply.get("thought", "")).strip()
         if thought:
             ctx.logger.info("AI: %s", thought)

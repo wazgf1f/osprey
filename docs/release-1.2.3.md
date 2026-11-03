@@ -17,6 +17,18 @@
 - 已有实例时用 FindWindow 找到 “Osprey 计划编辑器”
 - ShowWindow / BringWindowToTop / SetForegroundWindow 恢复并置前
 
+## 本地 Qwen-VL 修复
+
+- 3B 默认只有 4096 context，之前 1 万多 tokens 会直接 HTTP 400
+- 现在请求显式设置 num_ctx=16384，并把 OCR 元素限制在 80 个
+- 兼容 3B 的 terminate / left_click / scroll_down 别名和 coordinate 输出，
+  最终仍映射到 OCR 元素点击
+- 已用真实 qwen2.5vl:3b 跑通 dry-run：1 次动作、0 错误
+
+## 日志
+
+每次启动在 %LOCALAPPDATA%\Osprey\logs 写独立文本日志，可用 osprey logs --open 查看。
+
 ## 同时包含
 
 - 1.2.2：无参数启动默认打开 GUI，快捷方式直接 osprey.exe gui

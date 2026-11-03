@@ -48,6 +48,7 @@ class TestQwenClient(unittest.TestCase):
         body = json.loads(request.data.decode("utf-8"))
         self.assertEqual(body["model"], LOCAL_MODELS["3b"])
         self.assertEqual(body["messages"][1]["images"], ["AAAA"])
+        self.assertEqual(body["options"]["num_ctx"], 16384)
 
     def test_http_error_is_qwen_error(self) -> None:
         import urllib.error

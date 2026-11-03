@@ -10,6 +10,10 @@ Keep a Changelog, and the project uses semantic versioning.
 - Single-instance editor: a named mutex detects an existing process, and the
   second launch restores and foregrounds the existing window instead of opening
   another one.
+- Local Qwen-VL requests use num_ctx=16384 and fewer OCR elements, fixing the
+  4096-token context error; terminate/left_click/scroll aliases and image
+  coordinates are normalized back to OCR element ids.
+- Per-run UTF-8 logs under %LOCALAPPDATA%\Osprey\logs, plus osprey logs.
 
 ## [1.2.2] - 2026-11-03
 
