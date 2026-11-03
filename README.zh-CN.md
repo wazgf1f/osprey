@@ -441,6 +441,6 @@ Osprey 里没有任何地方写死分辨率：画面尺寸、原点、点击目�
 
 MIT，见 [LICENSE](LICENSE)。
 
-Osprey 与米哈游 / HoYoverse 或任何游戏发行商无关。
+Osprey 是一个独立的通用界面自动化项目。
 
 作者：**Zhaorui Chen**。

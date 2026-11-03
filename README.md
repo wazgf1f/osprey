@@ -491,6 +491,6 @@ Build the Windows installer with <code>packaging/build_installer.py</code>; see
 
 MIT. See [LICENSE](LICENSE).
 
-Osprey is not affiliated with miHoYo, HoYoverse or any game publisher.
+Osprey is an independent general-purpose UI automation project.
 
 Author: **Zhaorui Chen**.
