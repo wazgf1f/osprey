@@ -290,9 +290,14 @@ DeepSeek 文本模式）和最大执行步数。
 | <code>osprey play PLAN.json [--live] [--loop N]</code> | 执行保存好的计划 |
 | <code>osprey find TEMPLATE [--threshold T] [--scales 1.0,0.9] [--all-screens] [--save OUT.png]</code> | 在实时画面上找模板 |
 | <code>osprey run TASK.py [--config C] [--live] [--fps N] [--duration S]</code> | 运行任务 |
+| <code>osprey logs [--open]</code> | 显示每次运行的日志目录，或打开最新日志 |
 
 只有 <code>--live</code> 才会真正发送输入。不加就是 dry-run：照常识别、只记录动作，
 不点任何东西。
+
+每次启动都会在 <code>%LOCALAPPDATA%\Osprey\logs</code> 下生成一个独立的
+<code>osprey-*.log</code>，包含版本、参数、异常和运行日志；默认保留最近 40 个。
+用 <code>osprey logs --open</code> 可以直接打开最新一份。
 
 ## 配置项
 

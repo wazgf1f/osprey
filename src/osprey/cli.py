@@ -17,6 +17,7 @@ from .core.config import load_config, resolve_asset
 from .core.engine import Engine, EngineConfig
 from .core.task import Task
 from .errors import ConfigError, OspreyError
+from .logging_setup import install_exception_hook, log_directory, start_run_log
 from .vision.io import draw_detections, load_gray, save_image
 from .vision.match import match_template
 
@@ -92,6 +93,25 @@ def cmd_gui(args: argparse.Namespace) -> int:
         print("the editor needs tkinter: %s" % exc, file=sys.stderr)
         return 2
     return run_gui(args.plan)
+
+
+def cmd_logs(args: argparse.Namespace) -> int:
+    folder = log_directory()
+    print(folder)
+    try:
+        files = sorted(folder.glob("osprey-*.log"), key=lambda p: p.stat().st_mtime,
+                       reverse=True)
+    except OSError:
+        files = []
+    for path in files[:20]:
+        print(path.name)
+    if args.open and files:
+        try:
+            os.startfile(str(files[0]))
+        except Exception as exc:
+            print("could not open %s: %s" % (files[0], exc), file=sys.stderr)
+            return 2
+    return 0
 
 
 def cmd_grab(args: argparse.Namespace) -> int:
@@ -353,6 +373,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_gui.add_argument("plan", nargs="?", help="optional plan.json to open")
     p_gui.set_defaults(func=cmd_gui)
 
+    p_logs = sub.add_parser("logs", help="show the per-run log directory")
+    p_logs.add_argument("--open", action="store_true", help="open the newest log")
+    p_logs.set_defaults(func=cmd_logs)
+
     p_crop = sub.add_parser("crop", help="save a screen region as a template")
     p_crop.add_argument("output")
     p_crop.add_argument("--region", type=_parse_region, required=True)
@@ -384,6 +408,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         args.func = cmd_gui
         args.plan = None
 
+    if getattr(args, "func", None) is not cmd_gui:
+        start_run_log("cli", argv)
+    install_exception_hook()
+
     level = logging.WARNING
     if args.verbose == 1:
         level = logging.INFO
@@ -394,9 +422,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         return int(args.func(args))
     except KeyboardInterrupt:
+        logger.warning("interrupted")
         print("interrupted", file=sys.stderr)
         return 130
     except (OspreyError, ValueError) as exc:
+        logger.error("error: %s", exc)
         print("error: %s" % exc, file=sys.stderr)
         return 2
 

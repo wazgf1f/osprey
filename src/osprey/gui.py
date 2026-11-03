@@ -37,6 +37,7 @@ from .ai.vision import (LOCAL_MODELS, MODEL_LABELS, MODEL_SIZES,
 from .errors import Aborted, ConfigError
 from .vision.io import save_image
 from . import __version__
+from .logging_setup import active_log_path, install_exception_hook, start_run_log
 from .win32util import enable_dpi_awareness
 
 logger = logging.getLogger("osprey.gui")
@@ -626,6 +627,7 @@ class PlanEditor:
 
         self._build()
         self._install_logging()
+        self.root.report_callback_exception = self._report_callback_exception
         self._fade_in()
 
         if plan_path:
@@ -895,9 +897,19 @@ class PlanEditor:
             lambda level, message: self.root.after(0, self._append_log, level, message)
         )
         handler.setFormatter(logging.Formatter("%(asctime)s  %(message)s", "%H:%M:%S"))
-        logging.getLogger("osprey").addHandler(handler)
-        logging.getLogger("osprey").setLevel(logging.INFO)
+        logger = logging.getLogger("osprey")
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
         self._log_handler = handler
+        path = active_log_path()
+        if path is not None:
+            logger.info("日志文件: %s", path)
+
+    def _report_callback_exception(self, exc_type, exc, tb) -> None:
+        try:
+            logger.error("UI callback exception", exc_info=(exc_type, exc, tb))
+        except Exception:
+            pass
 
     def _append_log(self, level: str, message: str) -> None:
         if self._closing:
@@ -1571,6 +1583,8 @@ def _bring_existing_editor(timeout: float = 4.0) -> bool:
 
 
 def run_gui(plan_path: Optional[str] = None) -> int:
+    start_run_log("gui", sys.argv)
+    install_exception_hook()
     enable_dpi_awareness()
     _detach_console()
     mutex, already_running = _acquire_instance()

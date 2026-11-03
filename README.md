@@ -323,9 +323,15 @@ Everything a task touches hangs off the context:
 | <code>osprey play PLAN.json [--live] [--loop N]</code> | Run a saved sequence |
 | <code>osprey find TEMPLATE [--threshold T] [--scales 1.0,0.9] [--all-screens] [--save OUT.png]</code> | Locate a template on the live screen |
 | <code>osprey run TASK.py [--config C] [--live] [--fps N] [--duration S]</code> | Run a task |
+| <code>osprey logs [--open]</code> | Show the per-run log folder, or open the newest log |
 
 Only <code>--live</code> sends real input. Without it the run is a dry run:
 detections are computed, actions are logged, nothing is clicked.
+
+Every launch writes a separate <code>osprey-*.log</code> under
+<code>%LOCALAPPDATA%\Osprey\logs</code> with version, arguments, exceptions
+and runtime messages; the newest 40 are kept. Run <code>osprey logs --open</code>
+to open the latest file.
 
 ## Configuration
 
