@@ -280,6 +280,32 @@ class TestGuiSmoke(unittest.TestCase):
             logging.getLogger("osprey").removeHandler(editor._log_handler)
             editor.root.destroy()
 
+    def test_cancel_before_model_download_starts(self) -> None:
+        import time
+        import tkinter as tk
+
+        from osprey.gui import ModelDownloadDialog
+
+        calls = []
+
+        class FakeManager:
+            def ensure_model(self, *args, **kwargs):
+                calls.append(model)
+                return None
+
+        model = "qwen2.5vl:3b"
+        root = tk.Tk()
+        try:
+            dialog = ModelDownloadDialog(
+                root, model=model, size="约 3 GB", manager=FakeManager())
+            dialog._close()
+            for _ in range(6):
+                root.update()
+                time.sleep(0.05)
+            self.assertEqual(calls, [])
+        finally:
+            root.destroy()
+
     def test_local_model_selection_prompts_with_size(self) -> None:
         import tkinter as tk
         from unittest import mock

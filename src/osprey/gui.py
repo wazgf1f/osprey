@@ -288,6 +288,8 @@ class ModelDownloadDialog(tk.Toplevel):
         self.result = False
         self._cancel = threading.Event()
         self._closed = False
+        self._running = False
+        self._start_after = None
 
         frame = ttk.Frame(self, padding=16)
         frame.pack(fill="both", expand=True)
@@ -305,9 +307,14 @@ class ModelDownloadDialog(tk.Toplevel):
         self.update_idletasks()
         self.wait_visibility()
         self.grab_set()
-        self.after(150, self._start)
+        self._start_after = self.after(150, self._start)
 
     def _start(self) -> None:
+        if self._closed:
+            self.destroy()
+            return
+        self._running = True
+
         def worker():
             try:
                 self.manager.ensure_model(
@@ -325,6 +332,8 @@ class ModelDownloadDialog(tk.Toplevel):
         threading.Thread(target=worker, daemon=True).start()
 
     def _progress(self, percent: int, message: str) -> None:
+        if self._closed:
+            return
         try:
             self.after(0, lambda: self._set_progress(percent, message))
         except tk.TclError:
@@ -338,6 +347,7 @@ class ModelDownloadDialog(tk.Toplevel):
             self.status_var.set(message)
 
     def _finish(self, exc: Optional[Exception], cancelled: bool = False) -> None:
+        self._running = False
         try:
             self.after(0, lambda: self._show_finish(exc, cancelled))
         except tk.TclError:
@@ -345,6 +355,7 @@ class ModelDownloadDialog(tk.Toplevel):
 
     def _show_finish(self, exc: Optional[Exception], cancelled: bool) -> None:
         if self._closed:
+            self.destroy()
             return
         if cancelled:
             self.status_var.set("下载已取消")
@@ -358,9 +369,21 @@ class ModelDownloadDialog(tk.Toplevel):
         self.cancel_button.configure(text="关闭", command=self._close)
 
     def _close(self) -> None:
+        if self._closed:
+            return
         self._cancel.set()
         self._closed = True
-        self.destroy()
+        if self._start_after is not None:
+            try:
+                self.after_cancel(self._start_after)
+            except tk.TclError:
+                pass
+            self._start_after = None
+        if not self._running:
+            self.destroy()
+            return
+        self.status_var.set("正在取消…")
+        self.cancel_button.configure(state="disabled")
 
 
 class AiDialog(tk.Toplevel):
@@ -373,6 +396,7 @@ class AiDialog(tk.Toplevel):
         self.minsize(660, 620)
         self.transient(master)
         self.result = None
+        self._closed = False
 
         frame = ttk.Frame(self, padding=14)
         frame.pack(fill="both", expand=True)
@@ -471,16 +495,24 @@ class AiDialog(tk.Toplevel):
         self.destroy()
 
     def _on_mode_change(self) -> None:
+        if self._closed:
+            return
         if self.mode_var.get() == "deepseek":
             self.local_status_var.set("本地模型：未检测")
             return
         self.local_status_var.set("正在检查本地模型…")
-        self.after(50, lambda: self._check_selected_model(False))
+        self.after(50, self._check_selected_model_if_open)
+
+    def _check_selected_model_if_open(self) -> None:
+        if not self._closed:
+            self._check_selected_model(False)
 
     def _download_model(self) -> None:
         self._check_selected_model(True)
 
     def _check_selected_model(self, force: bool) -> None:
+        if self._closed:
+            return
         mode = self.mode_var.get()
         if mode == "deepseek":
             if force:
@@ -528,6 +560,7 @@ class AiDialog(tk.Toplevel):
             self._checking_model = False
 
     def _cancel(self) -> None:
+        self._closed = True
         self.result = None
         self.destroy()
 

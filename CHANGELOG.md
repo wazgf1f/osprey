@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## [1.1.6] - 2026-11-03
+
+### Fixed
+
+- Cancelling a local model download no longer crashes: the pending start
+  callback is cancelled, worker callbacks stop after the window closes, and the
+  dialog is destroyed only after the pull thread exits.
+
 ## [1.1.5] - 2026-11-03
 
 ### Fixed
