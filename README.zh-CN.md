@@ -291,6 +291,7 @@ DeepSeek 文本模式）和最大执行步数。
 | <code>osprey find TEMPLATE [--threshold T] [--scales 1.0,0.9] [--all-screens] [--save OUT.png]</code> | 在实时画面上找模板 |
 | <code>osprey run TASK.py [--config C] [--live] [--fps N] [--duration S]</code> | 运行任务 |
 | <code>osprey logs [--open]</code> | 显示每次运行的日志目录，或打开最新日志 |
+| <code>osprey click --interval N [--count N] [--live]</code> | 每隔 N 秒点击当前鼠标位置，不截图 |
 
 只有 <code>--live</code> 才会真正发送输入。不加就是 dry-run：照常识别、只记录动作，
 不点任何东西。

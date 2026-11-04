@@ -19,6 +19,8 @@ Keep a Changelog, and the project uses semantic versioning.
 - The 7B profile is tuned for 8 GB cards: num_ctx=8192, 1024px image, 50 OCR
   elements, num_batch=64, and Ollama starts with FlashAttention + q8 KV cache.
 - Per-run UTF-8 logs under %LOCALAPPDATA%\Osprey\logs, plus osprey logs.
+- Timer clicker: click the current cursor every N seconds, optional count,
+  dry-run mode, F12/stop support, and no screenshots.
 
 ## [1.2.2] - 2026-11-03
 

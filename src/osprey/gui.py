@@ -28,6 +28,7 @@ from typing import List, Optional
 import numpy as np
 
 from .capture.gdi import GdiGrabber
+from .clicker import IntervalClicker
 from .core.engine import Engine, EngineConfig
 from .core.plan import Plan, Step
 from .core.sequence import SequenceTask
@@ -591,6 +592,68 @@ class AiDialog(tk.Toplevel):
         self.destroy()
 
 
+class AutoClickDialog(tk.Toplevel):
+    """Ask for a click interval; the main editor owns the worker thread."""
+
+    def __init__(self, master: tk.Misc, on_start) -> None:
+        super().__init__(master)
+        self.title("定时连点")
+        self.resizable(False, False)
+        self.transient(master)
+        self.configure(bg=PALETTE["bg"])
+        self._on_start = on_start
+
+        body = ttk.Frame(self, padding=16)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="每隔多久点一次左键").grid(row=0, column=0, sticky="w")
+        self.interval_var = tk.StringVar(value="5")
+        ttk.Entry(body, textvariable=self.interval_var, width=12).grid(
+            row=0, column=1, padx=(12, 0), sticky="w")
+        ttk.Label(body, text="秒", foreground=PALETTE["muted"]).grid(
+            row=0, column=2, padx=(4, 0), sticky="w")
+
+        ttk.Label(body, text="点击次数（0=一直点）").grid(row=1, column=0, sticky="w", pady=(10, 0))
+        self.count_var = tk.StringVar(value="0")
+        ttk.Entry(body, textvariable=self.count_var, width=12).grid(
+            row=1, column=1, padx=(12, 0), pady=(10, 0), sticky="w")
+
+        self.live_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(body, text="真实点击（不勾选只记录，不移动鼠标）",
+                        variable=self.live_var).grid(
+            row=2, column=0, columnspan=3, sticky="w", pady=(12, 0))
+        ttk.Label(body, text="点击位置是当前鼠标位置；F12 或“停止”可结束。",
+                  foreground=PALETTE["muted"]).grid(
+            row=3, column=0, columnspan=3, sticky="w", pady=(6, 0))
+
+        buttons = ttk.Frame(body)
+        buttons.grid(row=4, column=0, columnspan=3, sticky="e", pady=(16, 0))
+        ttk.Button(buttons, text="开始", command=self._submit,
+                   style="Accent.TButton").pack(side="right")
+        ttk.Button(buttons, text="取消", command=self.destroy,
+                   style="Tool.TButton").pack(side="right", padx=(0, 8))
+
+        self.bind("<Return>", lambda _event: self._submit())
+        self.bind("<Escape>", lambda _event: self.destroy())
+        self.grab_set()
+
+    def _submit(self) -> None:
+        try:
+            interval = float(self.interval_var.get().strip())
+            count = int(self.count_var.get().strip() or "0")
+        except ValueError:
+            messagebox.showerror("参数有误", "间隔和次数必须是数字。", parent=self)
+            return
+        if interval <= 0:
+            messagebox.showerror("参数有误", "间隔必须大于 0 秒。", parent=self)
+            return
+        if count < 0:
+            messagebox.showerror("参数有误", "次数不能是负数。", parent=self)
+            return
+        live = bool(self.live_var.get())
+        self.destroy()
+        self._on_start(interval, count, live)
+
+
 class PlanEditor:
     def __init__(self, plan_path: Optional[str] = None) -> None:
         enable_dpi_awareness()
@@ -613,6 +676,7 @@ class PlanEditor:
         self.steps: List[Step] = []
         self._safety = None
         self._input = None
+        self._clicker = None
         self._running = False
         self._stop_requested = False
         self._closing = False
@@ -834,6 +898,7 @@ class PlanEditor:
             ("打开计划", self._open_dialog, 0),
             ("保存", self._save, 6),
             ("另存为", lambda: self._save(True), 6),
+            ("定时连点", self._open_autoclick, 6),
             ("AI 指令…", self._open_ai, 6),
         ):
             button = ttk.Button(actions, text=label, command=command,
@@ -1235,6 +1300,59 @@ class PlanEditor:
             target=self._worker, args=(task, live, settings, fps), daemon=True)
         thread.start()
 
+    def _open_autoclick(self) -> None:
+        if self._running:
+            return
+        AutoClickDialog(self.root, self._start_autoclick)
+
+    def _start_autoclick(self, interval: float, count: int, live: bool) -> None:
+        if self._running:
+            return
+        if live and not messagebox.askyesno(
+            "真实点击", "会按间隔真实点击鼠标当前位置。\n继续吗？",
+            parent=self.root,
+        ):
+            return
+        self._clicker = IntervalClicker(
+            interval, count=count, dry_run=not live,
+            should_abort=lambda: self._closing,
+            on_click=lambda number: logger.info("定时连点 #%d", number),
+        )
+        self._stop_requested = False
+        self._running = True
+        self._set_running_buttons()
+        self._set_status("定时连点中：每 %.2f 秒%s" %
+                         (interval, "" if live else "（试运行）"), kind="run")
+        logger.info("定时连点开始：间隔 %.2f 秒，次数 %s，%s",
+                    interval, count or "不限", "真实" if live else "试运行")
+        threading.Thread(target=self._autoclick_worker, daemon=True).start()
+
+    def _autoclick_worker(self) -> None:
+        clicker = self._clicker
+        try:
+            clicks = clicker.run() if clicker is not None else 0
+        except Exception as exc:
+            self._post(self._autoclick_failed, exc)
+        else:
+            self._post(self._autoclick_finished, clicks)
+
+    def _autoclick_finished(self, clicks: int) -> None:
+        self._clicker = None
+        self._running = False
+        self._stop_requested = False
+        self._set_running_buttons()
+        self._set_status("定时连点结束：%d 次" % clicks)
+        logger.info("定时连点结束：%d 次", clicks)
+
+    def _autoclick_failed(self, exc: Exception) -> None:
+        self._clicker = None
+        self._running = False
+        self._stop_requested = False
+        self._set_running_buttons()
+        self._set_status("定时连点失败", kind="err")
+        logger.error("定时连点失败：%s", exc)
+        messagebox.showerror("定时连点失败", str(exc), parent=self.root)
+
     def _open_ai(self) -> None:
         if self._running:
             return
@@ -1313,6 +1431,8 @@ class PlanEditor:
 
     def _stop(self) -> None:
         self._stop_requested = True
+        if self._clicker is not None:
+            self._clicker.stop()
         if self._safety is not None:
             self._safety.request_stop("stopped from the editor")
         self._set_status("正在停止…", kind="run")

@@ -16,6 +16,7 @@ from . import __version__
 from .core.config import load_config, resolve_asset
 from .core.engine import Engine, EngineConfig
 from .core.task import Task
+from .clicker import IntervalClicker
 from .errors import ConfigError, OspreyError
 from .logging_setup import install_exception_hook, log_directory, start_run_log
 from .vision.io import draw_detections, load_gray, save_image
@@ -93,6 +94,15 @@ def cmd_gui(args: argparse.Namespace) -> int:
         print("the editor needs tkinter: %s" % exc, file=sys.stderr)
         return 2
     return run_gui(args.plan)
+
+
+def cmd_click(args: argparse.Namespace) -> int:
+    clicker = IntervalClicker(
+        args.interval, count=args.count, dry_run=not args.live,
+        on_click=lambda number: print("click #%d" % number))
+    clicks = clicker.run()
+    print("clicked %d time(s)" % clicks)
+    return 0
 
 
 def cmd_logs(args: argparse.Namespace) -> int:
@@ -372,6 +382,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_gui = sub.add_parser("gui", help="open the visual plan editor")
     p_gui.add_argument("plan", nargs="?", help="optional plan.json to open")
     p_gui.set_defaults(func=cmd_gui)
+
+    p_click = sub.add_parser("click", help="click the current cursor every N seconds")
+    p_click.add_argument("--interval", type=float, required=True,
+                         help="seconds between clicks")
+    p_click.add_argument("--count", type=int, default=0,
+                         help="stop after N clicks (0 = forever)")
+    p_click.add_argument("--live", action="store_true",
+                         help="actually click (default is dry run)")
+    p_click.set_defaults(func=cmd_click)
 
     p_logs = sub.add_parser("logs", help="show the per-run log directory")
     p_logs.add_argument("--open", action="store_true", help="open the newest log")

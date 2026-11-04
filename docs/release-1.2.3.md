@@ -43,6 +43,15 @@
 
 每次启动在 %LOCALAPPDATA%\Osprey\logs 写独立文本日志，可用 osprey logs --open 查看。
 
+## 新增：定时连点
+
+- 工具栏新增“定时连点”
+- 只按秒数点击当前鼠标位置，不截图、不找图
+- 可选点击次数（0 表示一直点）
+- 默认试运行，勾选“真实点击”才发送鼠标事件
+- 停止按钮或 F12 结束
+- 命令行也可用：osprey click --interval 5 --count 10 --live
+
 ## 同时包含
 
 - 1.2.2：无参数启动默认打开 GUI，快捷方式直接 osprey.exe gui
