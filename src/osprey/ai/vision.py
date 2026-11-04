@@ -49,6 +49,15 @@ class QwenVisionError(OspreyError):
     """Local Qwen-VL/Ollama is unavailable or returned an invalid reply."""
 
 
+def _popen(cmd, **kwargs):
+    """Start a child hidden; some frozen/windowed environments reject STARTUPINFO."""
+    try:
+        return subprocess.Popen(cmd, startupinfo=_startupinfo(), **kwargs)
+    except OSError:
+        kwargs.pop("startupinfo", None)
+        return subprocess.Popen(cmd, startupinfo=None, **kwargs)
+
+
 def _server_env():
     env = os.environ.copy()
     env.setdefault("OLLAMA_FLASH_ATTENTION", "1")
@@ -104,11 +113,10 @@ class OllamaManager:
             return
         exe = self.executable()
         try:
-            self._process = subprocess.Popen(
+            self._process = _popen(
                 [exe, "serve"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                startupinfo=_startupinfo(),
                 env=_server_env(),
             )
         except OSError as exc:
@@ -144,7 +152,7 @@ class OllamaManager:
             return
         exe = self.executable()
         try:
-            process = subprocess.Popen(
+            process = _popen(
                 [exe, "pull", model],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -152,7 +160,6 @@ class OllamaManager:
                 encoding="utf-8",
                 errors="replace",
                 bufsize=1,
-                startupinfo=_startupinfo(),
             )
         except OSError as exc:
             raise QwenVisionError("could not start ollama pull: %s" % exc) from exc

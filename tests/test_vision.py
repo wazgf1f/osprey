@@ -169,6 +169,21 @@ class TestOllamaManager(unittest.TestCase):
                 manager.ensure_model("qwen2.5vl:3b", should_abort=lambda: True)
         self.assertTrue(process.terminate.called)
 
+    def test_startupinfo_failure_retries_without_it(self) -> None:
+        manager = OllamaManager()
+        manager.is_running = lambda: True
+        manager.models = lambda: []
+        manager.executable = lambda: "ollama"
+        process = mock.Mock(returncode=0)
+        process.stdout = None
+        process.poll.return_value = 0
+        with mock.patch("osprey.ai.vision.subprocess.Popen",
+                        side_effect=[OSError(50, "not supported"), process]) as popen:
+            manager.ensure_model("qwen2.5vl:3b")
+        self.assertEqual(popen.call_count, 2)
+        self.assertIn("startupinfo", popen.call_args_list[0].kwargs)
+        self.assertIsNone(popen.call_args_list[1].kwargs.get("startupinfo"))
+
     def test_existing_model_is_not_pulled(self) -> None:
         manager = OllamaManager()
         manager.is_running = lambda: True
