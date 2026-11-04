@@ -287,6 +287,9 @@ def parse_action_text(content: str) -> Dict[str, Any]:
     upper = text.upper()
     if upper in ("DONE", "FINISH", "TERMINATE", "COMPLETE"):
         return {"action": "done"}
+    # Some 3B builds answer with just the element number, then repeat it.
+    if upper.isdigit() and len(set(upper)) == 1:
+        return {"action": "click", "element_id": int(upper[0])}
     match = re.search(r"(?:LEFT_)?CLICK\s*[:(]?\s*(\d+)", upper)
     if match:
         return {"action": "click", "element_id": int(match.group(1))}

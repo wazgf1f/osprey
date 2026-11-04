@@ -119,6 +119,21 @@ class TestOcrAgent(unittest.TestCase):
         task.step(ctx)
         self.assertTrue(ctx.safety.aborted)
 
+    def test_repeated_click_stops_the_task(self) -> None:
+        items = [OcrItem("OK", (10, 10, 20, 20))]
+        client = FakeClient([
+            {"action": "click", "element_id": 0},
+            {"action": "click", "element_id": 0},
+            {"action": "click", "element_id": 0},
+        ])
+        task = OcrAgentTask(client=client, ocr=lambda _frame: items)
+        ctx = make_context()
+        task.setup(ctx)
+        for _ in range(3):
+            task.step(ctx)
+        self.assertTrue(ctx.safety.aborted)
+        self.assertIn("repeated", ctx.safety.reason)
+
     def test_invalid_element_id_does_not_click(self) -> None:
         items = [OcrItem("OK", (10, 10, 20, 20))]
         client = FakeClient([{"action": "click", "element_id": 9}])

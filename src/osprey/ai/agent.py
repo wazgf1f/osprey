@@ -116,6 +116,11 @@ class OcrAgentTask(Task):
             ctx.sleep(self.tick_wait)
             return
         self._apply(ctx, items, action)
+        recent = self.history[-3:]
+        if (len(recent) == 3 and recent[0] == recent[1] == recent[2]
+                and recent[0].startswith("click ")):
+            ctx.logger.warning("AI repeated %r three times; stopping", recent[0])
+            ctx.safety.request_stop("AI repeated the same click")
 
     def _decide(self, ctx: Context, items: List[OcrItem]) -> Dict[str, Any]:
         elements = []
@@ -228,8 +233,9 @@ class VisionAgentTask(OcrAgentTask):
                 should_abort=ctx.safety.should_abort)
         prepare = getattr(self.vision, "ensure_ready", None)
         if prepare is not None:
-            ctx.logger.info("Preparing local Qwen-VL model %s",
-                            getattr(self.vision, "model", ""))
+            ctx.logger.info("Preparing local Qwen-VL model %s (profile %s)",
+                            getattr(self.vision, "model", ""),
+                            getattr(self.vision, "profile", "?"))
             try:
                 prepare(should_abort=ctx.safety.check)
             except TypeError:
@@ -320,7 +326,7 @@ class VisionAgentTask(OcrAgentTask):
             if score > best_score:
                 best_score = score
                 best_index = index
-        if best_index is not None and best_score >= 0.22:
+        if best_index is not None and best_score >= 0.45:
             return {
                 "action": "click",
                 "element_id": best_index,
