@@ -11,7 +11,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -314,10 +314,16 @@ def _dedupe(items: List[OcrItem]) -> List[OcrItem]:
     return kept
 
 
-def _windows_items(frame: Frame, *, detail: bool = False) -> List[OcrItem]:
+def _windows_items(frame: Frame, *, detail: bool = False,
+                   should_abort: Optional[Callable[[], bool]] = None) -> List[OcrItem]:
     """Windows OCR; detail also scans the lower half at 4x for small buttons."""
     from PIL import Image, ImageOps
 
+    def abort() -> None:
+        if should_abort is not None and should_abort():
+            raise OcrError("OCR aborted")
+
+    abort()
     rgb = np.ascontiguousarray(frame.bgr[..., ::-1])
     base = Image.fromarray(rgb)
     items = _run_windows_ocr(base)
@@ -330,6 +336,7 @@ def _windows_items(frame: Frame, *, detail: bool = False) -> List[OcrItem]:
     step = 350
     for y in range(top, base.height, tile_size):
         for x in range(0, base.width, step):
+            abort()
             right = min(x + tile_size, base.width)
             bottom = min(y + tile_size, base.height)
             if right - x < 20 or bottom - y < 20:
@@ -366,10 +373,13 @@ def default_ocr_backend() -> str:
 
 def ocr_frame(frame: Frame, *, backend: str = "auto",
               min_confidence: float = 0.4, max_items: int = 80,
-              detail: bool = False) -> List[OcrItem]:
+              detail: bool = False,
+              should_abort: Optional[Callable[[], bool]] = None) -> List[OcrItem]:
     """OCR the frame and return text boxes sorted top-to-bottom, left-to-right."""
     if max_items <= 0:
         return []
+    if should_abort is not None and should_abort():
+        raise OcrError("OCR aborted")
     if backend not in ("auto", "rapidocr", "pytesseract", "windows"):
         raise OcrError("unknown OCR backend: %r" % (backend,))
 
@@ -383,7 +393,8 @@ def ocr_frame(frame: Frame, *, backend: str = "auto",
             elif name == "pytesseract":
                 items = _tesseract_items(frame)
             else:
-                items = _windows_items(frame, detail=detail)
+                items = _windows_items(
+                    frame, detail=detail, should_abort=should_abort)
         except Exception as exc:
             errors.append("%s: %s" % (name, exc))
             continue

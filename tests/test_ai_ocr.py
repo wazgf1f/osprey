@@ -71,6 +71,10 @@ class TestBackendSelection(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform == "win32", "Windows OCR runs on Windows")
 class TestWindowsOcr(unittest.TestCase):
+    def test_aborts_before_backend(self) -> None:
+        with self.assertRaises(OcrError):
+            ocr_frame(make_frame(sample_template()), should_abort=lambda: True)
+
     def test_parses_utf8_json_and_boxes(self) -> None:
         payload = [{
             "text": "确定 取消",

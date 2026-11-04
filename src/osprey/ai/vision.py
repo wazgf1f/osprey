@@ -223,6 +223,8 @@ class QwenVisionClient:
         if self.base_url.endswith("/v1"):
             self.base_url = self.base_url[:-3]
         self.timeout = float(timeout)
+        if self.profile == "7b":
+            self.timeout = min(self.timeout, 45.0)
         self.max_width = int(settings["max_width"])
         self.max_items = int(settings["max_items"])
         self.num_batch = int(settings["num_batch"])

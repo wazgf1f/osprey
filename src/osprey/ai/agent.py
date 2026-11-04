@@ -73,7 +73,8 @@ class OcrAgentTask(Task):
             default_ocr_backend()
         self.client = self._client or DeepSeekClient(api_key=self._api_key)
         self.ocr = self._ocr or functools.partial(
-            ocr_frame, detail=True, max_items=250)
+            ocr_frame, detail=True, max_items=250,
+            should_abort=ctx.safety.should_abort)
         self.steps = 0
         self.history = []
         self._ocr_failures = 0
@@ -83,9 +84,13 @@ class OcrAgentTask(Task):
             ctx.safety.request_stop("AI step limit reached")
             return
         self.steps += 1
+        ctx.logger.info("AI step %d/%d: scanning screen...",
+                        self.steps, self.max_steps)
         try:
             items = self.ocr(ctx.frame)
         except Exception as exc:
+            if ctx.safety.aborted:
+                return
             self._ocr_failures += 1
             ctx.logger.warning("OCR failed (%d/3): %s", self._ocr_failures, exc)
             if self._ocr_failures >= 3:
@@ -94,6 +99,7 @@ class OcrAgentTask(Task):
             ctx.sleep(self.tick_wait)
             return
         self._ocr_failures = 0
+        ctx.logger.info("AI step %d: %d OCR candidates", self.steps, len(items))
         if not items:
             ctx.logger.info("OCR found no text; waiting")
             ctx.sleep(self.tick_wait)
@@ -158,6 +164,8 @@ class OcrAgentTask(Task):
             if button not in ("left", "right", "middle"):
                 button = "left"
             ctx.click(item.center, button=button)
+            ctx.logger.info("AI click #%d %r at (%d, %d)", element_id,
+                            item.text, item.center[0], item.center[1])
             self.history.append("click %d %r" % (element_id, item.text))
             ctx.sleep(self.tick_wait)
             return
@@ -169,6 +177,7 @@ class OcrAgentTask(Task):
                 seconds = 1.0
             if not math.isfinite(seconds):
                 seconds = 1.0
+            ctx.logger.info("AI wait %.1fs", seconds)
             ctx.sleep(max(0.2, min(10.0, seconds)))
             return
 
@@ -184,11 +193,14 @@ class OcrAgentTask(Task):
             ys = sorted(item.center[1] for item in items)
             target = (xs[len(xs) // 2], ys[len(ys) // 2])
             ctx.scroll(amount, target)
+            ctx.logger.info("AI scroll %d at (%d, %d)", amount,
+                            target[0], target[1])
             self.history.append("scroll %d" % amount)
             ctx.sleep(self.tick_wait)
             return
 
         if kind == "done":
+            ctx.logger.info("AI reports goal reached")
             self.history.append("done")
             ctx.safety.request_stop("AI goal reached")
             return
@@ -212,7 +224,8 @@ class VisionAgentTask(OcrAgentTask):
             # Local VLMs have a limited context; send fewer OCR elements.
             self.ocr = functools.partial(
                 ocr_frame, detail=True,
-                max_items=getattr(self.vision, "max_items", 80))
+                max_items=getattr(self.vision, "max_items", 80),
+                should_abort=ctx.safety.should_abort)
         prepare = getattr(self.vision, "ensure_ready", None)
         if prepare is not None:
             ctx.logger.info("Preparing local Qwen-VL model %s",
@@ -240,10 +253,14 @@ class VisionAgentTask(OcrAgentTask):
         }
         max_width = getattr(self.vision, "max_width", 1600)
         image = annotate_frame(ctx.frame, items, max_width=max_width)
+        ctx.logger.info("Qwen-VL thinking (%d boxes, image %dpx)...",
+                        len(items), max_width)
         try:
             reply = self.vision.complete_json(
                 VISION_SYSTEM_PROMPT, json.dumps(payload, ensure_ascii=False), image)
         except Exception as exc:
+            if ctx.safety.aborted:
+                return {"action": "done"}
             ctx.logger.warning("Qwen-VL decision failed; OCR fallback: %s", exc)
             return self._fallback_action(items)
         kind = str(reply.get("action", "")).strip().lower()
