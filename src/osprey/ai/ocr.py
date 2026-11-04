@@ -229,12 +229,21 @@ def _run_windows_ocr(image, *, offset=(0, 0), scale: float = 1.0,
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = subprocess.SW_HIDE
+        command = [
+            powershell, "-STA", "-NoProfile", "-NonInteractive",
+            "-ExecutionPolicy", "Bypass", "-File", str(script),
+            "-Path", image_path, "-Out", json_path,
+        ]
         try:
             result = subprocess.run(
-                [powershell, "-STA", "-NoProfile", "-NonInteractive",
-                 "-ExecutionPolicy", "Bypass", "-File", str(script),
-                 "-Path", image_path, "-Out", json_path],
-                capture_output=True, timeout=timeout, startupinfo=startupinfo,
+                command, capture_output=True, timeout=timeout,
+                startupinfo=startupinfo,
+            )
+        except OSError:
+            # Frozen/windowed apps can reject STARTUPINFO (WinError 50).
+            result = subprocess.run(
+                command, capture_output=True, timeout=timeout,
+                startupinfo=None,
             )
         except subprocess.TimeoutExpired as exc:
             raise OcrError("Windows OCR timed out") from exc
