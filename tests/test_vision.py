@@ -98,8 +98,8 @@ class TestActionText(unittest.TestCase):
         self.assertEqual(parse_action_text("DONE"), {"action": "done"})
         self.assertEqual(parse_action_text("left_click 2"),
                          {"action": "click", "element_id": 2})
-        self.assertEqual(parse_action_text("88888888"),
-                         {"action": "click", "element_id": 8})
+        with self.assertRaises(QwenVisionError):
+            parse_action_text("88888888")
 
 
 class TestLoopbackOllama(unittest.TestCase):

@@ -6,6 +6,7 @@ import difflib
 import functools
 import json
 import math
+import re
 from typing import Any, Callable, Dict, List, Optional
 
 from ..core.context import Context
@@ -117,9 +118,12 @@ class OcrAgentTask(Task):
             return
         self._apply(ctx, items, action)
         recent = self.history[-3:]
-        if (len(recent) == 3 and recent[0] == recent[1] == recent[2]
-                and recent[0].startswith("click ")):
-            ctx.logger.warning("AI repeated %r three times; stopping", recent[0])
+        same_id = [re.match(r"click (\d+)", entry) for entry in recent]
+        if (len(recent) == 3
+                and all(match is not None for match in same_id)
+                and len({match.group(1) for match in same_id}) == 1):
+            ctx.logger.warning("AI clicked element #%s three times; stopping",
+                               same_id[0].group(1))
             ctx.safety.request_stop("AI repeated the same click")
 
     def _decide(self, ctx: Context, items: List[OcrItem]) -> Dict[str, Any]:
@@ -326,7 +330,7 @@ class VisionAgentTask(OcrAgentTask):
             if score > best_score:
                 best_score = score
                 best_index = index
-        if best_index is not None and best_score >= 0.45:
+        if best_index is not None and best_score >= 0.55:
             return {
                 "action": "click",
                 "element_id": best_index,
